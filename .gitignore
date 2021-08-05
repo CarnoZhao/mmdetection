@@ -1,5 +1,8 @@
 # Byte-compiled / optimized / DLL files
 __pycache__/
+work_images
+nohup.out
+submission.json
 *.py[cod]
 *$py.class
 
