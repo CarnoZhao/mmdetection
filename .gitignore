@@ -1,5 +1,6 @@
 # Byte-compiled / optimized / DLL files
-__pycache__/
+
+run.sh
 *.ipynb
 work_images
 nohup.out
