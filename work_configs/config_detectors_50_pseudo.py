@@ -305,7 +305,7 @@ data = dict(
             pipeline=test_pipeline)
 )
 
-work_dir = './work_dirs/pig/config_detectors_50_gc'
+work_dir = './work_dirs/pig/config_detectors_50_gc_ps'
 evaluation = dict(
     classwise=True, 
     interval=1, 

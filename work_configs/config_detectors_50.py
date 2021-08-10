@@ -1,4 +1,4 @@
-num_classes = 1
+num_classes = 5
 # model settings
 model = dict(
     type='CascadeRCNN',
@@ -53,8 +53,10 @@ model = dict(
             target_stds=[1.0, 1.0, 1.0, 1.0]),
         loss_cls=dict(
             type='CrossEntropyLoss', use_sigmoid=True, loss_weight=1.0),
-        loss_bbox=dict(
-            type='SmoothL1Loss', beta=0.1111111111111111, loss_weight=1.0)),
+        # loss_bbox=dict(
+        #     type='SmoothL1Loss', beta=0.1111111111111111, loss_weight=1.0),
+        reg_decoded_bbox=True,      # 使用GIoUI时注意添加
+        loss_bbox=dict(type='GIoULoss', loss_weight=5.0)),
     roi_head=dict(
         type='CascadeRoIHead',
         num_stages=3,
@@ -81,8 +83,10 @@ model = dict(
                     type='CrossEntropyLoss',
                     use_sigmoid=False,
                     loss_weight=1.0),
-                loss_bbox=dict(type='SmoothL1Loss', beta=1.0,
-                               loss_weight=1.0)),
+                # loss_bbox=dict(type='SmoothL1Loss', beta=1.0,
+                #                loss_weight=1.0),
+                reg_decoded_bbox=True,      # 使用GIoUI时注意添加
+                loss_bbox=dict(type='GIoULoss', loss_weight=5.0)),
             dict(
                 type='Shared2FCBBoxHead',
                 in_channels=256,
@@ -98,8 +102,10 @@ model = dict(
                     type='CrossEntropyLoss',
                     use_sigmoid=False,
                     loss_weight=1.0),
-                loss_bbox=dict(type='SmoothL1Loss', beta=1.0,
-                               loss_weight=1.0)),
+                # loss_bbox=dict(type='SmoothL1Loss', beta=1.0,
+                #                loss_weight=1.0),
+                reg_decoded_bbox=True,      # 使用GIoUI时注意添加
+                loss_bbox=dict(type='GIoULoss', loss_weight=5.0)),
             dict(
                 type='Shared2FCBBoxHead',
                 in_channels=256,
@@ -115,7 +121,10 @@ model = dict(
                     type='CrossEntropyLoss',
                     use_sigmoid=False,
                     loss_weight=1.0),
-                loss_bbox=dict(type='SmoothL1Loss', beta=1.0, loss_weight=1.0))
+                # loss_bbox=dict(type='SmoothL1Loss', beta=1.0,
+                #                loss_weight=1.0),
+                reg_decoded_bbox=True,      # 使用GIoUI时注意添加
+                loss_bbox=dict(type='GIoULoss', loss_weight=5.0))
         ]),
     train_cfg = dict(
         rpn=dict(
@@ -201,8 +210,8 @@ model = dict(
             nms=dict(type='soft_nms', iou_threshold=0.5, min_score=0.0001),
             max_per_img=100)))
 dataset_type = 'CocoDataset'
-data_root = 'data/pig/'
-# classes = ["phone", "pad", "laptop", "wallet", "packsack"]
+data_root = 'data/rich/'
+classes = ["phone", "pad", "laptop", "wallet", "packsack"]
 # classes = ["knife",
 #     "scissors",
 #     "sharpTools",
@@ -215,7 +224,7 @@ data_root = 'data/pig/'
 #     "battery",
 #     "seal",
 #     "umbrella"]
-classes = ["pig"]
+# classes = ["pig"]
 
 albu_train_transforms = [
     dict(type='RandomRotate90', p=0.5)
@@ -226,7 +235,7 @@ img_norm_cfg = dict(
 train_pipeline = [
     dict(type='LoadImageFromFile'),
     dict(type='LoadAnnotations', with_bbox=True),
-    dict(type='Resize', img_scale=[(2000, 800), (2000, 1000)], keep_ratio=True),
+    dict(type='Resize', img_scale=[(2000, 720), (2000, 896)], keep_ratio=True),
     dict(type='RandomFlip', flip_ratio=0.5),
     dict(type='Normalize', **img_norm_cfg),
     dict(type='Pad', size_divisor=32),
@@ -247,7 +256,7 @@ test_pipeline = [
     dict(type='LoadImageFromFile'),
     dict(
         type='MultiScaleFlipAug',
-        img_scale=[(2000, 800), (2000, 1000)],
+        img_scale=[(2000, 720), (2000, 896)],
         flip=True,
         transforms=[
             dict(type='Resize', keep_ratio=True),
@@ -293,7 +302,7 @@ data = dict(
             pipeline=test_pipeline)
 )
 
-work_dir = './work_dirs/pig/config_detectors_50_gc'
+work_dir = './work_dirs/rich/config_detectors_50_gc_giou'
 evaluation = dict(
     classwise=True, 
     interval=1, 
@@ -308,9 +317,9 @@ lr_config = dict(
     warmup_ratio=1/3,
     step=[8, 11])
 custom_hooks = [dict(type='NumClassCheckHook')]
-runner = dict(type='EpochBasedRunner', max_epochs=12)
 total_epochs = 12
-checkpoint_config = dict(interval=12)
+runner = dict(type='EpochBasedRunner', max_epochs=total_epochs)
+checkpoint_config = dict(interval=total_epochs)
 log_config = dict(interval=50, hooks=[dict(type='TextLoggerHook')])
 dist_params = dict(backend='nccl')
 log_level = 'INFO'
