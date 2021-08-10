@@ -53,10 +53,8 @@ model = dict(
             target_stds=[1.0, 1.0, 1.0, 1.0]),
         loss_cls=dict(
             type='CrossEntropyLoss', use_sigmoid=True, loss_weight=1.0),
-        # loss_bbox=dict(
-        #     type='SmoothL1Loss', beta=0.1111111111111111, loss_weight=1.0),
-        reg_decoded_bbox=True,      # 使用GIoUI时注意添加
-        loss_bbox=dict(type='GIoULoss', loss_weight=5.0)),
+        loss_bbox=dict(
+            type='SmoothL1Loss', beta=0.1111111111111111, loss_weight=1.0)),
     roi_head=dict(
         type='CascadeRoIHead',
         num_stages=3,
@@ -83,10 +81,8 @@ model = dict(
                     type='CrossEntropyLoss',
                     use_sigmoid=False,
                     loss_weight=1.0),
-                # loss_bbox=dict(type='SmoothL1Loss', beta=1.0,
-                #                loss_weight=1.0),
-                reg_decoded_bbox=True,      # 使用GIoUI时注意添加
-                loss_bbox=dict(type='GIoULoss', loss_weight=5.0)),
+                loss_bbox=dict(type='SmoothL1Loss', beta=1.0,
+                               loss_weight=1.0)),
             dict(
                 type='Shared2FCBBoxHead',
                 in_channels=256,
@@ -102,10 +98,8 @@ model = dict(
                     type='CrossEntropyLoss',
                     use_sigmoid=False,
                     loss_weight=1.0),
-                # loss_bbox=dict(type='SmoothL1Loss', beta=1.0,
-                #                loss_weight=1.0),
-                reg_decoded_bbox=True,      # 使用GIoUI时注意添加
-                loss_bbox=dict(type='GIoULoss', loss_weight=5.0)),
+                loss_bbox=dict(type='SmoothL1Loss', beta=1.0,
+                               loss_weight=1.0)),
             dict(
                 type='Shared2FCBBoxHead',
                 in_channels=256,
@@ -121,10 +115,8 @@ model = dict(
                     type='CrossEntropyLoss',
                     use_sigmoid=False,
                     loss_weight=1.0),
-                # loss_bbox=dict(type='SmoothL1Loss', beta=1.0,
-                #                loss_weight=1.0),
-                reg_decoded_bbox=True,      # 使用GIoUI时注意添加
-                loss_bbox=dict(type='GIoULoss', loss_weight=5.0))
+                loss_bbox=dict(type='SmoothL1Loss', beta=1.0,
+                               loss_weight=1.0))
         ]),
     train_cfg = dict(
         rpn=dict(
@@ -237,6 +229,7 @@ train_pipeline = [
     dict(type='LoadAnnotations', with_bbox=True),
     dict(type='Resize', img_scale=[(2000, 720), (2000, 896)], keep_ratio=True),
     dict(type='RandomFlip', flip_ratio=0.5),
+    dict(type='AutoAugmentPolicy', autoaug_type="v1"),
     dict(type='Normalize', **img_norm_cfg),
     dict(type='Pad', size_divisor=32),
     dict(type='Albu',
@@ -302,7 +295,7 @@ data = dict(
             pipeline=test_pipeline)
 )
 
-work_dir = './work_dirs/rich/config_detectors_50_gc_giou'
+work_dir = './work_dirs/rich/config_detectors_50_aav1'
 evaluation = dict(
     classwise=True, 
     interval=1, 
