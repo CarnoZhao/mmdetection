@@ -1,6 +1,9 @@
 import copy
+import os
 import inspect
+from collections import defaultdict
 
+import cv2
 import mmcv
 import numpy as np
 from numpy import random
@@ -21,7 +24,79 @@ except ImportError:
     albumentations = None
     Compose = None
 
-@PIPELINES.register_module
+@PIPELINES.register_module()
+class BoxPaste(object):
+    def __init__(self, objects_from, sample_thr, sample_n=2, vflip=0.5, hflip=0.5, p=0.5):
+        file_names = os.listdir(objects_from)
+        self.cuts = defaultdict(list)
+        for file_name in file_names:
+            category = int(file_name.split("_")[0])
+            file_name = os.path.join(objects_from, file_name)
+            cut = cv2.cvtColor(cv2.imread(file_name), cv2.COLOR_BGR2RGB)
+            self.cuts[category].append(cut)
+        self.p = p
+        self.classes = list(self.cuts)
+        self.cnts = [len(self.cuts[c]) for c in self.classes]
+        self.class_weight = [(sample_thr * sum(self.cnts) / cnt) ** 0.5 for cnt in self.cnts]
+        self.class_weight = [_ / sum(self.class_weight) for _ in self.class_weight]
+        self.sample_n = sample_n
+        self.vflip = vflip
+        self.hflip = hflip
+
+    ###
+        # bp = BoxPaste("./data/check/cuts", 0.1)
+        # self = bp
+        # from pycocotools.coco import COCO
+        # gt = COCO("./data/check/train/annotations/train.json")
+        # img = cv2.cvtColor(cv2.imread(os.path.join("./data/check/train/images", gt.imgs[list(gt.imgs)[0]]["file_name"])), cv2.COLOR_BGR2RGB)
+        # ann_ids = gt.getAnnIds(imgIds = [list(gt.imgs)[0]])
+        # boxes = []
+        # labels = []
+        # for ann_id in ann_ids:
+        #     ann = gt.anns[ann_id]
+        #     x, y, w, h = ann["bbox"]
+        #     c = ann["category_id"]
+        #     boxes.append([x, y, x + w, y + h])
+        #     labels.append(c)
+        # boxes = np.array(boxes)
+        # labels = np.array(labels)
+    ###
+
+    def __call__(self, results):
+        img, boxes, labels = [
+            results[k] for k in ('img', 'gt_bboxes', 'gt_labels')
+        ]
+        # img2 = img.copy()
+        # colors = np.random.randint(0, 256, (13, 3))
+        # for i in range(len(boxes)):
+        #     x1, y1, x2, y2 = [(int(_)) for _ in boxes[i]]
+        #     c = labels[i]
+        #     img2 = cv2.rectangle(img2, (x1, y1), (x2, y2), color = [int(_) for _ in colors[c]], thickness = 5)
+        # cv2.imwrite("./tmp.png", img2)
+        if random.random() < self.p and len(boxes) < 20:
+            class_idx = np.random.choice(len(self.classes), self.sample_n, p = self.class_weight)
+            cut_idx = [np.random.choice(self.cnts[_], 1)[0] for _ in class_idx]
+            for i in range(self.sample_n):
+                cut = self.cuts[self.classes[class_idx[i]]][cut_idx[i]]
+                h, w = cut.shape[:2]
+                if random.random() < self.vflip:
+                    cut = cut[::-1]
+                if random.random() < self.hflip:
+                    cut = cut[:,::-1]
+                start_x = np.random.randint(0, img.shape[1] - w)
+                start_y = np.random.randint(0, img.shape[0] - h)
+                img[start_y:start_y + h, start_x:start_x + w] = img[start_y:start_y + h, start_x:start_x + w] // 2 + cut // 2
+                new_box = np.array([[start_x, start_y, start_x + w, start_y + h]]).astype(boxes.dtype)
+                boxes = np.concatenate([boxes, new_box])
+                labels = np.concatenate([labels, [self.classes[class_idx[i]] - 1]])
+            results['img'] = img
+            results['gt_bboxes'] = boxes
+            results['gt_labels'] = labels
+        else:
+            pass
+        return results
+
+@PIPELINES.register_module()
 class MixUp(object):
     def __init__(self, p=0.3, lambd=0.5):
         self.lambd = lambd
@@ -53,6 +128,60 @@ class MixUp(object):
         self.boxes2 = boxes1
         self.labels2 =  labels1
         return results
+
+@PIPELINES.register_module()
+class BBoxJitter(object):
+    """
+    bbox jitter
+    Args:
+        min (int, optional): min scale
+        max (int, optional): max scale
+        ## origin w scale
+    """
+
+    def __init__(self, min=0, max=2):
+        self.min_scale = min
+        self.max_scale = max
+        self.count = 0
+
+    def bbox_jitter(self, bboxes, img_shape):
+        """Flip bboxes horizontally.
+        Args:
+            bboxes(ndarray): shape (..., 4*k)
+            img_shape(tuple): (height, width)
+        """
+        assert bboxes.shape[-1] % 4 == 0
+        if len(bboxes) == 0:
+            return bboxes
+        jitter_bboxes = []
+        for box in bboxes:
+            w = box[2] - box[0]
+            h = box[3] - box[1]
+            center_x = (box[0] + box[2]) / 2
+            center_y = (box[1] + box[3]) / 2
+            scale = np.random.uniform(self.min_scale, self.max_scale)
+            w = w * scale / 2.
+            h = h * scale / 2.
+            xmin = center_x - w
+            ymin = center_y - h
+            xmax = center_x + w
+            ymax = center_y + h
+            box2 = np.array([xmin, ymin, xmax, ymax], dtype=np.float32)
+            jitter_bboxes.append(box2)
+        jitter_bboxes = np.array(jitter_bboxes, dtype=np.float32)
+        jitter_bboxes[:, 0::2] = np.clip(jitter_bboxes[:, 0::2], 0, img_shape[1] - 1)
+        jitter_bboxes[:, 1::2] = np.clip(jitter_bboxes[:, 1::2], 0, img_shape[0] - 1)
+        return jitter_bboxes
+
+    def __call__(self, results):
+        for key in results.get('bbox_fields', []):
+            results[key] = self.bbox_jitter(results[key],
+                                          results['img_shape'])
+        return results
+
+    def __repr__(self):
+        return self.__class__.__name__ + '(bbox_jitter={}-{})'.format(
+            self.min_scale, self.max_scale)
 
 @PIPELINES.register_module()
 class AutoAugmentPolicy(object):

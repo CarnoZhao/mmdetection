@@ -1,4 +1,4 @@
-num_classes = 5
+num_classes = 12
 # model settings
 model = dict(
     type='CascadeRCNN',
@@ -202,20 +202,19 @@ model = dict(
             nms=dict(type='soft_nms', iou_threshold=0.5, min_score=0.0001),
             max_per_img=100)))
 dataset_type = 'CocoDataset'
-data_root = 'data/rich/'
-classes = ["phone", "pad", "laptop", "wallet", "packsack"]
-# classes = ["knife",
-#     "scissors",
-#     "sharpTools",
-#     "expandableBaton",
-#     "smallGlassBottle",
-#     "electricBaton",
-#     "plasticBeverageBottle",
-#     "plasticBottleWithaNozzle",
-#     "electronicEquipment",
-#     "battery",
-#     "seal",
-#     "umbrella"]
+data_root = 'data/check/'
+classes = ["knife",
+    "scissors",
+    "sharpTools",
+    "expandableBaton",
+    "smallGlassBottle",
+    "electricBaton",
+    "plasticBeverageBottle",
+    "plasticBottleWithaNozzle",
+    "electronicEquipment",
+    "battery",
+    "seal",
+    "umbrella"]
 # classes = ["pig"]
 
 albu_train_transforms = [
@@ -229,7 +228,9 @@ train_pipeline = [
     dict(type='LoadAnnotations', with_bbox=True),
     dict(type='Resize', img_scale=[(2000, 720), (2000, 896)], keep_ratio=True),
     dict(type='RandomFlip', flip_ratio=0.5),
-    dict(type='AutoAugmentPolicy', autoaug_type="v1"),
+    # dict(type='AutoAugmentPolicy', autoaug_type="v1"),
+    # dict(type='BoxPaste', objects_from="./data/check/cuts", sample_thr=0.05, sample_n=5, p=0.8),
+    dict(type="BBoxJitter", min=0.9, max=1.1),
     dict(type='Normalize', **img_norm_cfg),
     dict(type='Pad', size_divisor=32),
     dict(type='Albu',
@@ -295,7 +296,7 @@ data = dict(
             pipeline=test_pipeline)
 )
 
-work_dir = './work_dirs/rich/config_detectors_50_aav1'
+work_dir = './work_dirs/check/config_detectors_50_boxjitter'
 evaluation = dict(
     classwise=True, 
     interval=1, 
