@@ -1,4 +1,4 @@
-num_classes = 5
+num_classes = 12
 
 model = dict(
     type='CascadeRCNN',
@@ -192,25 +192,25 @@ model = dict(
             max_per_img=100)))
 
 dataset_type = 'CocoDataset'
-data_root = 'data/rich/'
-classes = ["phone", "pad", "laptop", "wallet", "packsack"]
-# classes = ["knife",
-#     "scissors",
-#     "sharpTools",
-#     "expandableBaton",
-#     "smallGlassBottle",
-#     "electricBaton",
-#     "plasticBeverageBottle",
-#     "plasticBottleWithaNozzle",
-#     "electronicEquipment",
-#     "battery",
-#     "seal",
-#     "umbrella"]
+data_root = 'data/check/'
+# classes = ["phone", "pad", "laptop", "wallet", "packsack"]
+classes = ["knife",
+    "scissors",
+    "sharpTools",
+    "expandableBaton",
+    "smallGlassBottle",
+    "electricBaton",
+    "plasticBeverageBottle",
+    "plasticBottleWithaNozzle",
+    "electronicEquipment",
+    "battery",
+    "seal",
+    "umbrella"]
 # classes = ["pig"]
 
-albu_train_transforms = [
-    dict(type='RandomRotate90', p=0.5)
-]
+# albu_train_transforms = [
+#     dict(type='RandomRotate90', p=0.5)
+# ]
 
 img_norm_cfg = dict(
     mean=[123.675, 116.28, 103.53], std=[58.395, 57.12, 57.375], to_rgb=True)
@@ -219,18 +219,20 @@ train_pipeline = [
     dict(type='LoadAnnotations', with_bbox=True),
     dict(type='Resize', img_scale=[(2000, 720), (2000, 896)], keep_ratio=True),
     dict(type='RandomFlip', flip_ratio=0.5),
+    dict(type='AutoAugmentPolicy', autoaug_type="v1"),
+    dict(type='BBoxJitter', min=0.9, max=1.1),
     dict(type='Normalize', **img_norm_cfg),
     dict(type='Pad', size_divisor=32),
-    dict(type='Albu',
-         transforms=albu_train_transforms,
-         bbox_params=dict(type='BboxParams',
-                          format='pascal_voc',
-                          label_fields=['gt_labels'],
-                          min_visibility=0.0,
-                          filter_lost_elements=True),
-         keymap={'img': 'image', 'gt_bboxes': 'bboxes'},
-         update_pad_shape=False,
-         skip_img_without_anno=True),
+    # dict(type='Albu',
+    #      transforms=albu_train_transforms,
+    #      bbox_params=dict(type='BboxParams',
+    #                       format='pascal_voc',
+    #                       label_fields=['gt_labels'],
+    #                       min_visibility=0.0,
+    #                       filter_lost_elements=True),
+    #      keymap={'img': 'image', 'gt_bboxes': 'bboxes'},
+    #      update_pad_shape=False,
+    #      skip_img_without_anno=True),
     dict(type='DefaultFormatBundle'),
     dict(type='Collect', keys=['img', 'gt_bboxes', 'gt_labels']),
 ]
@@ -238,8 +240,9 @@ test_pipeline = [
     dict(type='LoadImageFromFile'),
     dict(
         type='MultiScaleFlipAug',
-        img_scale=[(2000, 720), (2000, 896)],
+        img_scale=[(2000, 720), (2000, 760), (2000, 800), (2000, 840), (2000, 896)],
         flip=True,
+        flip_direction=["horizontal","vertical","diagonal"],
         transforms=[
             dict(type='Resize', keep_ratio=True),
             dict(type='RandomFlip'),
@@ -252,18 +255,18 @@ test_pipeline = [
 data = dict(
     samples_per_gpu=2,
     workers_per_gpu=2,
-    train=dict(
-            classes=classes,
-            type=dataset_type,
-            ann_file=data_root + 'train/jsons/train_fold_0.json',
-            img_prefix=data_root + 'train/images/',
-            pipeline=train_pipeline),
     # train=dict(
     #         classes=classes,
     #         type=dataset_type,
-    #         ann_file=data_root + 'train/annotations/train.json',
+    #         ann_file=data_root + 'train/jsons/train_fold_0.json',
     #         img_prefix=data_root + 'train/images/',
     #         pipeline=train_pipeline),
+    train=dict(
+            classes=classes,
+            type=dataset_type,
+            ann_file=data_root + 'train/annotations/train.json',
+            img_prefix=data_root + 'train/images/',
+            pipeline=train_pipeline),
     val=dict(
             classes=classes,
             type=dataset_type,
@@ -284,10 +287,10 @@ data = dict(
             pipeline=test_pipeline)
 )
 
-work_dir = './work_dirs/rich/config_swin_s'
+work_dir = './work_dirs/check/config_swins_36e_aav1_boxjitter_all_resume'
 evaluation = dict(
     classwise=True, 
-    interval=1, 
+    interval=24, 
     metric='bbox',
     jsonfile_prefix=f"{work_dir}/valid")
 optimizer = dict(type='AdamW', lr=0.0001, betas=(0.9, 0.999), weight_decay=0.05,
@@ -300,9 +303,9 @@ lr_config = dict(
     warmup='linear',
     warmup_iters=500,
     warmup_ratio=1/3,
-    step=[8, 11])
+    step=[24, 33])
 custom_hooks = [dict(type='NumClassCheckHook')]
-total_epochs = 12
+total_epochs = 36
 runner = dict(type='EpochBasedRunner', max_epochs=total_epochs)
 checkpoint_config = dict(interval=total_epochs)
 log_config = dict(interval=50, hooks=[dict(type='TextLoggerHook')])
