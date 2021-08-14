@@ -208,31 +208,31 @@ classes = ["knife",
     "umbrella"]
 # classes = ["pig"]
 
-# albu_train_transforms = [
-#     dict(type='RandomRotate90', p=0.5)
-# ]
+albu_train_transforms = [
+    dict(type='RandomRotate90', p=0.5)
+]
 
 img_norm_cfg = dict(
     mean=[123.675, 116.28, 103.53], std=[58.395, 57.12, 57.375], to_rgb=True)
 train_pipeline = [
     dict(type='LoadImageFromFile'),
     dict(type='LoadAnnotations', with_bbox=True),
-    dict(type='Resize', img_scale=[(2000, 720), (2000, 896)], keep_ratio=True),
+    dict(type='Resize', img_scale=[(1600, 1400), (1600, 896)], keep_ratio=True),
     dict(type='RandomFlip', flip_ratio=0.5),
-    dict(type='AutoAugmentPolicy', autoaug_type="v1"),
-    dict(type='BBoxJitter', min=0.9, max=1.1),
+    # dict(type='AutoAugmentPolicy', autoaug_type="v1"),
+    dict(type='BBoxJitter', min=0.95, max=1.05),
     dict(type='Normalize', **img_norm_cfg),
     dict(type='Pad', size_divisor=32),
-    # dict(type='Albu',
-    #      transforms=albu_train_transforms,
-    #      bbox_params=dict(type='BboxParams',
-    #                       format='pascal_voc',
-    #                       label_fields=['gt_labels'],
-    #                       min_visibility=0.0,
-    #                       filter_lost_elements=True),
-    #      keymap={'img': 'image', 'gt_bboxes': 'bboxes'},
-    #      update_pad_shape=False,
-    #      skip_img_without_anno=True),
+    dict(type='Albu',
+         transforms=albu_train_transforms,
+         bbox_params=dict(type='BboxParams',
+                          format='pascal_voc',
+                          label_fields=['gt_labels'],
+                          min_visibility=0.0,
+                          filter_lost_elements=True),
+         keymap={'img': 'image', 'gt_bboxes': 'bboxes'},
+         update_pad_shape=False,
+         skip_img_without_anno=True),
     dict(type='DefaultFormatBundle'),
     dict(type='Collect', keys=['img', 'gt_bboxes', 'gt_labels']),
 ]
@@ -287,10 +287,10 @@ data = dict(
             pipeline=test_pipeline)
 )
 
-work_dir = './work_dirs/check/config_swins_36e_aav1_boxjitter_all_resume'
+work_dir = './work_dirs/check/config_swins_36e_boxjitter_largesize_rotate_all'
 evaluation = dict(
     classwise=True, 
-    interval=24, 
+    interval=12, 
     metric='bbox',
     jsonfile_prefix=f"{work_dir}/valid")
 optimizer = dict(type='AdamW', lr=0.0001, betas=(0.9, 0.999), weight_decay=0.05,

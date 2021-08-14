@@ -29,7 +29,7 @@ model = dict(
         anchor_generator=dict(
             type='AnchorGenerator',
             scales=[8],
-            ratios=[0.25, 0.5, 1.0, 2.0, 2.5],
+            ratios=[0.5, 1.0, 2.0],
             strides=[4, 8, 16, 32, 64]),
         bbox_coder=dict(
             type='DeltaXYWHBBoxCoder',
@@ -201,9 +201,9 @@ classes = ["knife",
     "seal",
     "umbrella"]
 
-albu_train_transforms = [
-    dict(type='RandomRotate90', p=0.5)
-]
+# albu_train_transforms = [
+#     dict(type='RandomRotate90', p=0.5)
+# ]
 
 img_norm_cfg = dict(
     mean=[123.675, 116.28, 103.53], std=[58.395, 57.12, 57.375], to_rgb=True)
@@ -211,22 +211,22 @@ train_pipeline = [
     dict(type='LoadImageFromFile'),
     dict(type='LoadAnnotations', with_bbox=True),
     dict(type='Resize', img_scale=[(2000, 720), (2000, 896)], keep_ratio=True),
-    dict(type='RandomFlip', flip_ratio=0.5),
+    dict(type='RandomFlip', flip_ratio=[0.25, 0.25, 0.25], direction=['horizontal','vertical','diagonal']),
     dict(type='AutoAugmentPolicy', autoaug_type="v1"),
     # dict(type='BoxPaste', objects_from="./data/check/cuts", sample_thr=0.05, sample_n=5, p=0.8),
-    dict(type="BBoxJitter", min=0.95, max=1.05),
+    dict(type="BBoxJitter", min=0.9, max=1.1),
     dict(type='Normalize', **img_norm_cfg),
     dict(type='Pad', size_divisor=32),
-    dict(type='Albu',
-         transforms=albu_train_transforms,
-         bbox_params=dict(type='BboxParams',
-                          format='pascal_voc',
-                          label_fields=['gt_labels'],
-                          min_visibility=0.0,
-                          filter_lost_elements=True),
-         keymap={'img': 'image', 'gt_bboxes': 'bboxes'},
-         update_pad_shape=False,
-         skip_img_without_anno=True),
+    # dict(type='Albu',
+    #      transforms=albu_train_transforms,
+    #      bbox_params=dict(type='BboxParams',
+    #                       format='pascal_voc',
+    #                       label_fields=['gt_labels'],
+    #                       min_visibility=0.0,
+    #                       filter_lost_elements=True),
+    #      keymap={'img': 'image', 'gt_bboxes': 'bboxes'},
+    #      update_pad_shape=False,
+    #      skip_img_without_anno=True),
     dict(type='DefaultFormatBundle'),
     dict(type='Collect', keys=['img', 'gt_bboxes', 'gt_labels']),
 ]
@@ -293,9 +293,9 @@ lr_config = dict(
     warmup='linear',
     warmup_iters=500,
     warmup_ratio=1/3,
-    step=[8, 11])
+    step=[18, 22])
 custom_hooks = [dict(type='NumClassCheckHook')]
-total_epochs = 12
+total_epochs = 24
 runner = dict(type='EpochBasedRunner', max_epochs=total_epochs)
 checkpoint_config = dict(interval=total_epochs)
 log_config = dict(interval=50, hooks=[dict(type='TextLoggerHook')])

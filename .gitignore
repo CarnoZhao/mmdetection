@@ -1,4 +1,5 @@
 # Byte-compiled / optimized / DLL files
+*.zip
 *.json
 tmp*
 __pycache__/
