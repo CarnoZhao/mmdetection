@@ -218,6 +218,9 @@ classes = ["phone", "pad", "laptop", "wallet", "packsack"]
 #     "umbrella"]
 # classes = ["pig"]
 
+albu_train_transforms = [
+    dict(type='RandomRotate90', p=0.5)
+]
 
 img_norm_cfg = dict(
     mean=[123.675, 116.28, 103.53], std=[58.395, 57.12, 57.375], to_rgb=True)
@@ -228,9 +231,19 @@ train_pipeline = [
     dict(type='RandomFlip', flip_ratio=0.5),
     dict(type='AutoAugmentPolicy', autoaug_type="v1"),
     # dict(type='BoxPaste', objects_from="./data/check/cuts", sample_thr=0.05, sample_n=5, p=0.8),
-    dict(type="BBoxJitter", min=0.95, max=1.05),
+    dict(type="BBoxJitter", min=0.98, max=1.02),
     dict(type='Normalize', **img_norm_cfg),
     dict(type='Pad', size_divisor=32),
+    dict(type='Albu',
+         transforms=albu_train_transforms,
+         bbox_params=dict(type='BboxParams',
+                          format='pascal_voc',
+                          label_fields=['gt_labels'],
+                          min_visibility=0.0,
+                          filter_lost_elements=True),
+         keymap={'img': 'image', 'gt_bboxes': 'bboxes'},
+         update_pad_shape=False,
+         skip_img_without_anno=True),
     dict(type='DefaultFormatBundle'),
     dict(type='Collect', keys=['img', 'gt_bboxes', 'gt_labels']),
 ]
@@ -240,7 +253,6 @@ test_pipeline = [
         type='MultiScaleFlipAug',
         img_scale=[(2000, 720), (2000, 800), (2000, 896)],
         flip=True,
-        flip_direction=["horizontal","vertical","diagonal"],
         transforms=[
             dict(type='Resize', keep_ratio=True),
             dict(type='RandomFlip'),
@@ -251,7 +263,7 @@ test_pipeline = [
         ])
 ]
 data = dict(
-    samples_per_gpu=2,
+    samples_per_gpu=3,
     workers_per_gpu=2,
     # train=dict(
     #         classes=classes,
@@ -285,7 +297,7 @@ data = dict(
             pipeline=test_pipeline)
 )
 
-work_dir = './work_dirs/rich/config_detectors_50_24e_boxjitter_aav1_all'
+work_dir = './work_dirs/rich/config_detectors_50_12e_6bs_boxjitter_aav1_rotate_all'
 evaluation = dict(
     classwise=True, 
     interval=12, 
@@ -298,9 +310,9 @@ lr_config = dict(
     warmup='linear',
     warmup_iters=500,
     warmup_ratio=1/3,
-    step=[16, 22])
+    step=[8, 11])
 custom_hooks = [dict(type='NumClassCheckHook')]
-total_epochs = 24
+total_epochs = 12
 runner = dict(type='EpochBasedRunner', max_epochs=total_epochs)
 checkpoint_config = dict(interval=total_epochs)
 log_config = dict(interval=50, hooks=[dict(type='TextLoggerHook')])

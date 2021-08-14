@@ -213,8 +213,11 @@ img_norm_cfg = dict(
 train_pipeline = [
     dict(type='LoadImageFromFile'),
     dict(type='LoadAnnotations', with_bbox=True),
-    dict(type='Resize', img_scale=[(4096, 720), (4096, 896)], keep_ratio=True),
+    dict(type='Resize', img_scale=[(2000, 720), (2000, 896)], keep_ratio=True),
     dict(type='RandomFlip', flip_ratio=0.5),
+    dict(type='AutoAugmentPolicy', autoaug_type="v1"),
+    # dict(type='BoxPaste', objects_from="./data/check/cuts", sample_thr=0.05, sample_n=5, p=0.8),
+    # dict(type="BBoxJitter", min=0.98, max=1.02),
     dict(type='Normalize', **img_norm_cfg),
     dict(type='Pad', size_divisor=32),
     dict(type='Albu',
@@ -234,7 +237,7 @@ test_pipeline = [
     dict(type='LoadImageFromFile'),
     dict(
         type='MultiScaleFlipAug',
-        img_scale=[(4096, 720), (4096, 896)],
+        img_scale=[(2000, 720), (2000, 800), (2000, 896)],
         flip=True,
         transforms=[
             dict(type='Resize', keep_ratio=True),
@@ -254,18 +257,18 @@ data = dict(
     #         ann_file=data_root + 'train/jsons/train_fold_0.json',
     #         img_prefix=data_root + 'train/images/',
     #         pipeline=train_pipeline),
-    val=dict(
-            classes=classes,
-            type=dataset_type,
-            ann_file=data_root + 'train/jsons/valid_fold_0.json',
-            img_prefix=data_root + 'train/images/',
-            pipeline=test_pipeline),
     train=dict(
             classes=classes,
             type=dataset_type,
             ann_file=data_root + 'train/annotations/train.json',
             img_prefix=data_root + 'train/images/',
             pipeline=train_pipeline),
+    val=dict(
+            classes=classes,
+            type=dataset_type,
+            ann_file=data_root + 'train/jsons/valid_fold_0.json',
+            img_prefix=data_root + 'train/images/',
+            pipeline=test_pipeline),
     # test=dict(
     #         classes=classes,
     #         type=dataset_type,
@@ -280,7 +283,7 @@ data = dict(
             pipeline=test_pipeline)
 )
 
-work_dir = './work_dirs/config_detectors_50_gc_all_swa'
+work_dir = './work_dirs/rich/config_detectors_50_12e_6bs_boxjitter_aav1_rotate_all_swa'
 evaluation = dict(
     classwise=True, 
     interval=12, 
@@ -295,9 +298,9 @@ lr_config = dict(
     warmup_ratio=1/3,
     step=[8, 11])
 custom_hooks = [dict(type='NumClassCheckHook')]
-runner = dict(type='EpochBasedRunner', max_epochs=12)
 total_epochs = 12
-checkpoint_config = dict(interval=12)
+runner = dict(type='EpochBasedRunner', max_epochs=total_epochs)
+checkpoint_config = dict(interval=total_epochs)
 log_config = dict(interval=50, hooks=[dict(type='TextLoggerHook')])
 dist_params = dict(backend='nccl')
 log_level = 'INFO'
@@ -311,7 +314,7 @@ only_swa_training = True
 # whether to perform swa training
 swa_training = True
 # load the best pre_trained model as the starting model for swa training
-swa_load_from = './work_dirs/config_detectors_50_gc_all/best_bbox_mAP_epoch_12.pth'
+swa_load_from = './work_dirs/rich/config_detectors_50_12e_6bs_boxjitter_aav1_rotate_all/best_bbox_mAP_epoch_12.pth'
 swa_resume_from = None
 
 # swa optimizer
