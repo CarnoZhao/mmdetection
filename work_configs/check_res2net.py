@@ -1,43 +1,24 @@
-num_classes = 5
+num_classes = 12
 # model settings
 model = dict(
     type='CascadeRCNN',
     pretrained=None,
     backbone=dict(
-        type='DetectoRS_ResNet',
-        depth=50,
+        type='Res2Net',
+        depth=101,
         num_stages=4,
         out_indices=(0, 1, 2, 3),
         frozen_stages=1,
         norm_cfg=dict(type='BN', requires_grad=True),
         norm_eval=True,
         style='pytorch',
-        conv_cfg=dict(type='ConvAWS'),
-        sac=dict(type='SAC', use_deform=True),
-        stage_with_sac=(False, True, True, True),
-        output_img=True),
+        dcn=dict(type='DCN', deform_groups=1, fallback_on_stride=False),
+        stage_with_dcn=(False, True, True, True)),
     neck=dict(
-        type='RFP',
+        type='FPN',
         in_channels=[256, 512, 1024, 2048],
         out_channels=256,
-        num_outs=5,
-        rfp_steps=2,
-        aspp_out_channels=64,
-        aspp_dilations=(1, 3, 6, 1),
-        rfp_backbone=dict(
-            rfp_inplanes=256,
-            type='DetectoRS_ResNet',
-            depth=50,
-            num_stages=4,
-            out_indices=(0, 1, 2, 3),
-            frozen_stages=1,
-            norm_cfg=dict(type='BN', requires_grad=True),
-            norm_eval=True,
-            conv_cfg=dict(type='ConvAWS'),
-            sac=dict(type='SAC', use_deform=True),
-            stage_with_sac=(False, True, True, True),
-            pretrained=None,
-            style='pytorch')),
+        num_outs=5),
     rpn_head=dict(
         type='RPNHead',
         in_channels=256,
@@ -63,8 +44,7 @@ model = dict(
             type='SingleRoIExtractor',
             roi_layer=dict(type='RoIAlign', output_size=7, sampling_ratio=0),
             out_channels=256,
-            featmap_strides=[4, 8, 16, 32],
-            add_context=True),
+            featmap_strides=[4, 8, 16, 32]),
         bbox_head=[
             dict(
                 type='Shared2FCBBoxHead',
@@ -115,10 +95,9 @@ model = dict(
                     type='CrossEntropyLoss',
                     use_sigmoid=False,
                     loss_weight=1.0),
-                loss_bbox=dict(type='SmoothL1Loss', beta=1.0,
-                               loss_weight=1.0))
+                loss_bbox=dict(type='SmoothL1Loss', beta=1.0, loss_weight=1.0))
         ]),
-    train_cfg = dict(
+    train_cfg=dict(
         rpn=dict(
             assigner=dict(
                 type='MaxIoUAssigner',
@@ -191,7 +170,7 @@ model = dict(
                 pos_weight=-1,
                 debug=False)
         ]),
-    test_cfg = dict(
+    test_cfg=dict(
         rpn=dict(
             nms_pre=1000,
             max_per_img=1000,
@@ -199,52 +178,44 @@ model = dict(
             min_bbox_size=0),
         rcnn=dict(
             score_thr=0.0001,
-            nms=dict(type='soft_nms', iou_threshold=0.5, min_score=0.0001),
+            nms=dict(type='nms', iou_threshold=0.5),
             max_per_img=100)))
+
 dataset_type = 'CocoDataset'
-data_root = 'data/rich/'
-classes = ["phone", "pad", "laptop", "wallet", "packsack"]
-# classes = ["knife",
-#     "scissors",
-#     "sharpTools",
-#     "expandableBaton",
-#     "smallGlassBottle",
-#     "electricBaton",
-#     "plasticBeverageBottle",
-#     "plasticBottleWithaNozzle",
-#     "electronicEquipment",
-#     "battery",
-#     "seal",
-#     "umbrella"]
-# classes = ["pig"]
+classes = ['knife', 'scissors', 'sharpTools', 'expandableBaton', 'smallGlassBottle', 'electricBaton', 'plasticBeverageBottle', 'plasticBottleWithaNozzle', 'electronicEquipment', 'battery', 'seal', 'umbrella']
+
 
 albu_train_transforms = [
-    dict(type='RandomRotate90', p=0.5)
-]
+    dict(type='RandomRotate90', p=0.5),
+    dict(type='ShiftScaleRotate', shift_limit=0.0625, scale_limit=0.5,
+         rotate_limit=30, interpolation=1, p=0.5)
+    ]
 
 img_norm_cfg = dict(
     mean=[123.675, 116.28, 103.53], std=[58.395, 57.12, 57.375], to_rgb=True)
 train_pipeline = [
-    dict(type='LoadImageFromFile'),
+    dict(type='LoadImageFromFile', to_float32=True),
     dict(type='LoadAnnotations', with_bbox=True),
-    dict(type='Resize', img_scale=[(2000, 720), (2000, 896)], keep_ratio=True),
+    dict(
+        type='Resize',
+        img_scale=[(2048, 600), (2048, 1000)],
+        multiscale_mode='range',
+        keep_ratio=True),
     dict(type='RandomFlip', flip_ratio=0.5),
-    dict(type='AutoAugmentPolicy', autoaug_type="v1"),
-    # dict(type='MixUp'),
-    dict(type='BoxPaste', objects_from="./data/rich/cuts", sample_thr=0.15, sample_n=2, p=0.8),
-    # dict(type="BBoxJitter", min=0.98, max=1.02),
     dict(type='Normalize', **img_norm_cfg),
     dict(type='Pad', size_divisor=32),
-    dict(type='Albu',
-         transforms=albu_train_transforms,
-         bbox_params=dict(type='BboxParams',
-                          format='pascal_voc',
-                          label_fields=['gt_labels'],
-                          min_visibility=0.0,
-                          filter_lost_elements=True),
-         keymap={'img': 'image', 'gt_bboxes': 'bboxes'},
-         update_pad_shape=False,
-         skip_img_without_anno=True),
+    dict(
+        type='Albu',
+        transforms=albu_train_transforms,
+        bbox_params=dict(
+            type='BboxParams',
+            format='pascal_voc',
+            label_fields=['gt_labels'],
+            min_visibility=0,
+            filter_lost_elements=True),
+        keymap=dict(img='image', gt_bboxes='bboxes'),
+        update_pad_shape=False,
+        skip_img_without_anno=True),
     dict(type='DefaultFormatBundle'),
     dict(type='Collect', keys=['img', 'gt_bboxes', 'gt_labels']),
 ]
@@ -252,7 +223,7 @@ test_pipeline = [
     dict(type='LoadImageFromFile'),
     dict(
         type='MultiScaleFlipAug',
-        img_scale=[(2000, 720), (2000, 800), (2000, 896)],
+        img_scale=[(2048, 600), (2048, 800), (2048, 1000)],
         flip=True,
         transforms=[
             dict(type='Resize', keep_ratio=True),
@@ -264,88 +235,50 @@ test_pipeline = [
         ])
 ]
 data = dict(
-    samples_per_gpu=3,
+    samples_per_gpu=2,
     workers_per_gpu=2,
-    # train=dict(
-    #         classes=classes,
-    #         type=dataset_type,
-    #         ann_file=data_root + 'train/jsons/train_fold_0.json',
-    #         img_prefix=data_root + 'train/images/',
-    #         pipeline=train_pipeline),
     train=dict(
+        type='RepeatDataset',
+        times=2,
+        dataset=dict(
             classes=classes,
             type=dataset_type,
-            ann_file=data_root + 'train/annotations/train.json',
-            img_prefix=data_root + 'train/images/',
-            pipeline=train_pipeline),
+            ann_file='data/xray/train/instances_trainval2017.json',
+            img_prefix='data/xray/train/images/',
+            pipeline=train_pipeline)),
     val=dict(
-            classes=classes,
-            type=dataset_type,
-            ann_file=data_root + 'train/jsons/valid_fold_0.json',
-            img_prefix=data_root + 'train/images/',
-            pipeline=test_pipeline),
-    # test=dict(
-    #         classes=classes,
-    #         type=dataset_type,
-    #         ann_file=data_root + 'train/jsons/valid_fold_0.json',
-    #         img_prefix=data_root + 'train/images/',
-    #         pipeline=test_pipeline),
+        type=dataset_type,
+        classes=classes,
+        ann_file='data/xray/train/split/instances_val2017_fold0.json',
+        img_prefix='data/xray/train/images',
+        pipeline=test_pipeline),
     test=dict(
-            classes=classes,
-            type=dataset_type,
-            ann_file=data_root + 'test_A/annotations/test.json',
-            img_prefix=data_root + 'test_A/images/',
-            pipeline=test_pipeline)
-)
-
-work_dir = './work_dirs/rich/drs_12e_6bs_bj_aav1_rot_bp_all_wswa'
-evaluation = dict(
-    classwise=True, 
-    interval=12, 
-    metric='bbox',
-    jsonfile_prefix=f"{work_dir}/valid")
-optimizer = dict(type='SGD', lr=0.01, momentum=0.9, weight_decay=0.0001)
-optimizer_config = dict(grad_clip=dict(max_norm=35, norm_type=2))
+        type=dataset_type,
+        classes=classes,
+        ann_file='data/xray/testA/testA.json',
+        img_prefix='data/xray/testA/images',
+        pipeline=test_pipeline))
+evaluation = dict(interval=1, metric='bbox', start=7)
+optimizer = dict(
+    type='SGD_GC',
+    lr=0.0025*6,
+    momentum=0.9,
+    weight_decay=0.0001,
+    paramwise_cfg=dict(bias_lr_mult=2.0, bias_decay_mult=0.0))
+optimizer_config = dict(grad_clip=None)
 lr_config = dict(
     policy='step',
     warmup='linear',
     warmup_iters=500,
-    warmup_ratio=1/3,
+    warmup_ratio=0.001,
     step=[8, 11])
-custom_hooks = [dict(type='NumClassCheckHook')]
 total_epochs = 12
-runner = dict(type='EpochBasedRunner', max_epochs=total_epochs)
-checkpoint_config = dict(interval=total_epochs)
+checkpoint_config = dict(interval=1)
 log_config = dict(interval=50, hooks=[dict(type='TextLoggerHook')])
 dist_params = dict(backend='nccl')
 log_level = 'INFO'
-load_from = './weights/detectors_htc_r50_1x_coco-329b1453.pth'
+load_from = 'weights/r2net_dcn_472-b4402aa3.pth'
 resume_from = None
 workflow = [('train', 1)]
-fp16 = dict(loss_scale=512.0)
-gpu_ids=(2,3)
+fp16 = dict(loss_scale=512.)
 
-
-only_swa_training = False
-# whether to perform swa training
-swa_training = True
-# load the best pre_trained model as the starting model for swa training
-swa_load_from = work_dir + '/epoch_12.pth'
-swa_resume_from = None
-
-# swa optimizer
-swa_optimizer = dict(type='SGD', lr=0.01, momentum=0.9, weight_decay=0.0001)
-swa_optimizer_config = dict(grad_clip=None)
-
-# swa learning policy
-swa_lr_config = dict(
-    policy='cyclic',
-    target_ratio=(1, 0.01),
-    cyclic_times=12,
-    step_ratio_up=0.0)
-swa_runner = dict(type='EpochBasedRunner', max_epochs=12)
-# the epoch interval to perform swa
-swa_interval = 1
-
-# swa checkpoint setting
-swa_checkpoint_config = dict(interval=1, filename_tmpl='swa_epoch_{}.pth')

@@ -14,6 +14,7 @@ from mmdet.core import DistEvalHook, EvalHook
 from mmdet.datasets import (build_dataloader, build_dataset,
                             replace_ImageToTensor)
 from mmdet.utils import get_root_logger
+from ..utils.SGD import SGD_GC
 
 
 def set_random_seed(seed, deterministic=False):
@@ -89,7 +90,10 @@ def train_detector(model,
     # skip building the runner for the traditional training
     if not cfg.get('only_swa_training', False):
         # build runner
-        optimizer = build_optimizer(model, cfg.optimizer)
+        if cfg.optimizer.type=='SGD_GC':
+            optimizer = SGD_GC(model.parameters(), cfg.optimizer.lr, momentum=cfg.optimizer.momentum,weight_decay=cfg.optimizer.weight_decay)
+        else:
+            optimizer = build_optimizer(model, cfg.optimizer)
 
         if 'runner' not in cfg:
             cfg.runner = {

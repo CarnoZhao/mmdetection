@@ -298,7 +298,7 @@ data = dict(
             pipeline=test_pipeline)
 )
 
-work_dir = './work_dirs/rich/drs_12e_6bs_bj_aav1_rot_bp_all_wswa'
+work_dir = './work_dirs/rich/drs_12e_6bs_aav1_rot_bp_all_wswa'
 evaluation = dict(
     classwise=True, 
     interval=12, 

@@ -209,7 +209,8 @@ classes = ["knife",
 # classes = ["pig"]
 
 albu_train_transforms = [
-    dict(type='RandomRotate90', p=0.5)
+    dict(type='RandomRotate90', p=0.5),
+    dict(type='ShiftScaleRotate', shift_limit=0.0625, scale_limit=0.5, rotate_limit=30, interpolation=1, p=0.5)
 ]
 
 img_norm_cfg = dict(
@@ -219,8 +220,8 @@ train_pipeline = [
     dict(type='LoadAnnotations', with_bbox=True),
     dict(type='Resize', img_scale=[(1600, 1400), (1600, 896)], keep_ratio=True),
     dict(type='RandomFlip', flip_ratio=0.5),
-    # dict(type='AutoAugmentPolicy', autoaug_type="v1"),
-    dict(type='BBoxJitter', min=0.95, max=1.05),
+    dict(type='AutoAugmentPolicy', autoaug_type="v1"),
+    # dict(type='BBoxJitter', min=0.95, max=1.05),
     dict(type='Normalize', **img_norm_cfg),
     dict(type='Pad', size_divisor=32),
     dict(type='Albu',
@@ -287,7 +288,7 @@ data = dict(
             pipeline=test_pipeline)
 )
 
-work_dir = './work_dirs/check/config_swins_36e_boxjitter_largesize_rotate_all'
+work_dir = './work_dirs/check/swins_24e_aav1_rot_ssrot_all'
 evaluation = dict(
     classwise=True, 
     interval=12, 
@@ -303,9 +304,9 @@ lr_config = dict(
     warmup='linear',
     warmup_iters=500,
     warmup_ratio=1/3,
-    step=[24, 33])
+    step=[16, 22])
 custom_hooks = [dict(type='NumClassCheckHook')]
-total_epochs = 36
+total_epochs = 24
 runner = dict(type='EpochBasedRunner', max_epochs=total_epochs)
 checkpoint_config = dict(interval=total_epochs)
 log_config = dict(interval=50, hooks=[dict(type='TextLoggerHook')])

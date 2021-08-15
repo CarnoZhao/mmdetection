@@ -1,4 +1,4 @@
-num_classes = 5
+num_classes = 12
 # model settings
 model = dict(
     type='CascadeRCNN',
@@ -115,10 +115,9 @@ model = dict(
                     type='CrossEntropyLoss',
                     use_sigmoid=False,
                     loss_weight=1.0),
-                loss_bbox=dict(type='SmoothL1Loss', beta=1.0,
-                               loss_weight=1.0))
+                loss_bbox=dict(type='SmoothL1Loss', beta=1.0, loss_weight=1.0))
         ]),
-    train_cfg = dict(
+    train_cfg=dict(
         rpn=dict(
             assigner=dict(
                 type='MaxIoUAssigner',
@@ -199,40 +198,46 @@ model = dict(
             min_bbox_size=0),
         rcnn=dict(
             score_thr=0.0001,
-            nms=dict(type='soft_nms', iou_threshold=0.5, min_score=0.0001),
+            nms=dict(type='nms', iou_threshold=0.5, min_score=0.0001),
             max_per_img=100)))
 dataset_type = 'CocoDataset'
-data_root = 'data/rich/'
-classes = ["phone", "pad", "laptop", "wallet", "packsack"]
-# classes = ["knife",
-#     "scissors",
-#     "sharpTools",
-#     "expandableBaton",
-#     "smallGlassBottle",
-#     "electricBaton",
-#     "plasticBeverageBottle",
-#     "plasticBottleWithaNozzle",
-#     "electronicEquipment",
-#     "battery",
-#     "seal",
-#     "umbrella"]
+data_root = 'data/check/'
+# classes = ["phone", "pad", "laptop", "wallet", "packsack"]
+classes = ["knife",
+    "scissors",
+    "sharpTools",
+    "expandableBaton",
+    "smallGlassBottle",
+    "electricBaton",
+    "plasticBeverageBottle",
+    "plasticBottleWithaNozzle",
+    "electronicEquipment",
+    "battery",
+    "seal",
+    "umbrella"]
 # classes = ["pig"]
 
 albu_train_transforms = [
-    dict(type='RandomRotate90', p=0.5)
+    dict(type='RandomRotate90', p=0.5),
+    dict(type='ShiftScaleRotate', shift_limit=0.0625, scale_limit=0.5,
+         rotate_limit=30, interpolation=1, p=0.5)
 ]
 
 img_norm_cfg = dict(
     mean=[123.675, 116.28, 103.53], std=[58.395, 57.12, 57.375], to_rgb=True)
 train_pipeline = [
-    dict(type='LoadImageFromFile'),
+    dict(type='LoadImageFromFile', to_float32=True),
     dict(type='LoadAnnotations', with_bbox=True),
-    dict(type='Resize', img_scale=[(2000, 720), (2000, 896)], keep_ratio=True),
+    dict(
+        type='Resize',
+        img_scale=[(2048, 600), (2048, 1000)],
+        multiscale_mode='range',
+        keep_ratio=True),
     dict(type='RandomFlip', flip_ratio=0.5),
-    dict(type='AutoAugmentPolicy', autoaug_type="v1"),
+    # dict(type='AutoAugmentPolicy', autoaug_type="v1"),
     # dict(type='MixUp'),
-    dict(type='BoxPaste', objects_from="./data/rich/cuts", sample_thr=0.15, sample_n=2, p=0.8),
-    # dict(type="BBoxJitter", min=0.98, max=1.02),
+    # dict(type='BoxPaste', objects_from="./data/rich/cuts", sample_thr=0.15, sample_n=2, p=0.8),
+    dict(type="BBoxJitter", min=0.95, max=1.05),
     dict(type='Normalize', **img_norm_cfg),
     dict(type='Pad', size_divisor=32),
     dict(type='Albu',
@@ -252,7 +257,7 @@ test_pipeline = [
     dict(type='LoadImageFromFile'),
     dict(
         type='MultiScaleFlipAug',
-        img_scale=[(2000, 720), (2000, 800), (2000, 896)],
+        img_scale=[(2048, 600), (2048, 800), (2048, 1000)],
         flip=True,
         transforms=[
             dict(type='Resize', keep_ratio=True),
@@ -264,7 +269,7 @@ test_pipeline = [
         ])
 ]
 data = dict(
-    samples_per_gpu=3,
+    samples_per_gpu=2,
     workers_per_gpu=2,
     # train=dict(
     #         classes=classes,
@@ -273,11 +278,14 @@ data = dict(
     #         img_prefix=data_root + 'train/images/',
     #         pipeline=train_pipeline),
     train=dict(
+        type='RepeatDataset',
+        times=2,
+        dataset=dict(
             classes=classes,
             type=dataset_type,
             ann_file=data_root + 'train/annotations/train.json',
             img_prefix=data_root + 'train/images/',
-            pipeline=train_pipeline),
+            pipeline=train_pipeline)),
     val=dict(
             classes=classes,
             type=dataset_type,
@@ -298,23 +306,26 @@ data = dict(
             pipeline=test_pipeline)
 )
 
-work_dir = './work_dirs/rich/drs_12e_6bs_bj_aav1_rot_bp_all_wswa'
+work_dir = './work_dirs/check/drs_2x_6bs_bj_ssrot_all'
 evaluation = dict(
     classwise=True, 
     interval=12, 
     metric='bbox',
     jsonfile_prefix=f"{work_dir}/valid")
-optimizer = dict(type='SGD', lr=0.01, momentum=0.9, weight_decay=0.0001)
-optimizer_config = dict(grad_clip=dict(max_norm=35, norm_type=2))
+optimizer = dict(
+    type='SGD_GC',
+    lr=0.0025*6,
+    momentum=0.9,
+    weight_decay=0.0001,
+    paramwise_cfg=dict(bias_lr_mult=2.0, bias_decay_mult=0.0))
+optimizer_config = dict(grad_clip=None)
 lr_config = dict(
     policy='step',
     warmup='linear',
     warmup_iters=500,
-    warmup_ratio=1/3,
+    warmup_ratio=0.001,
     step=[8, 11])
-custom_hooks = [dict(type='NumClassCheckHook')]
 total_epochs = 12
-runner = dict(type='EpochBasedRunner', max_epochs=total_epochs)
 checkpoint_config = dict(interval=total_epochs)
 log_config = dict(interval=50, hooks=[dict(type='TextLoggerHook')])
 dist_params = dict(backend='nccl')
@@ -323,29 +334,29 @@ load_from = './weights/detectors_htc_r50_1x_coco-329b1453.pth'
 resume_from = None
 workflow = [('train', 1)]
 fp16 = dict(loss_scale=512.0)
-gpu_ids=(2,3)
+# gpu_ids=(2,3)
 
 
-only_swa_training = False
-# whether to perform swa training
-swa_training = True
-# load the best pre_trained model as the starting model for swa training
-swa_load_from = work_dir + '/epoch_12.pth'
-swa_resume_from = None
+# only_swa_training = False
+# # whether to perform swa training
+# swa_training = True
+# # load the best pre_trained model as the starting model for swa training
+# swa_load_from = work_dir + '/epoch_12.pth'
+# swa_resume_from = None
 
-# swa optimizer
-swa_optimizer = dict(type='SGD', lr=0.01, momentum=0.9, weight_decay=0.0001)
-swa_optimizer_config = dict(grad_clip=None)
+# # swa optimizer
+# swa_optimizer = dict(type='SGD', lr=0.01, momentum=0.9, weight_decay=0.0001)
+# swa_optimizer_config = dict(grad_clip=None)
 
-# swa learning policy
-swa_lr_config = dict(
-    policy='cyclic',
-    target_ratio=(1, 0.01),
-    cyclic_times=12,
-    step_ratio_up=0.0)
-swa_runner = dict(type='EpochBasedRunner', max_epochs=12)
-# the epoch interval to perform swa
-swa_interval = 1
+# # swa learning policy
+# swa_lr_config = dict(
+#     policy='cyclic',
+#     target_ratio=(1, 0.01),
+#     cyclic_times=12,
+#     step_ratio_up=0.0)
+# swa_runner = dict(type='EpochBasedRunner', max_epochs=12)
+# # the epoch interval to perform swa
+# swa_interval = 1
 
-# swa checkpoint setting
-swa_checkpoint_config = dict(interval=1, filename_tmpl='swa_epoch_{}.pth')
+# # swa checkpoint setting
+# swa_checkpoint_config = dict(interval=1, filename_tmpl='swa_epoch_{}.pth')
