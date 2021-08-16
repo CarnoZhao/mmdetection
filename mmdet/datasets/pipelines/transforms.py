@@ -6,7 +6,9 @@ from collections import defaultdict
 import cv2
 import mmcv
 import numpy as np
+from copy import deepcopy
 from numpy import random
+import traceback
 
 from mmdet.core import PolygonMasks
 from mmdet.core.evaluation.bbox_overlaps import bbox_overlaps
@@ -1797,65 +1799,69 @@ class Albu:
 
     def __call__(self, results):
         # dict to albumentations format
-        results = self.mapper(results, self.keymap_to_albu)
-        # TODO: add bbox_fields
-        if 'bboxes' in results:
-            # to list of boxes
-            if isinstance(results['bboxes'], np.ndarray):
-                results['bboxes'] = [x for x in results['bboxes']]
-            # add pseudo-field for filtration
-            if self.filter_lost_elements:
-                results['idx_mapper'] = np.arange(len(results['bboxes']))
+        res = deepcopy(results)
+        try:
+            results = self.mapper(results, self.keymap_to_albu)
+            # TODO: add bbox_fields
+            if 'bboxes' in results:
+                # to list of boxes
+                if isinstance(results['bboxes'], np.ndarray):
+                    results['bboxes'] = [x for x in results['bboxes']]
+                # add pseudo-field for filtration
+                if self.filter_lost_elements:
+                    results['idx_mapper'] = np.arange(len(results['bboxes']))
 
-        # TODO: Support mask structure in albu
-        if 'masks' in results:
-            if isinstance(results['masks'], PolygonMasks):
-                raise NotImplementedError(
-                    'Albu only supports BitMap masks now')
-            ori_masks = results['masks']
-            if albumentations.__version__ < '0.5':
-                results['masks'] = results['masks'].masks
-            else:
-                results['masks'] = [mask for mask in results['masks'].masks]
+            # TODO: Support mask structure in albu
+            if 'masks' in results:
+                if isinstance(results['masks'], PolygonMasks):
+                    raise NotImplementedError(
+                        'Albu only supports BitMap masks now')
+                ori_masks = results['masks']
+                if albumentations.__version__ < '0.5':
+                    results['masks'] = results['masks'].masks
+                else:
+                    results['masks'] = [mask for mask in results['masks'].masks]
 
-        results = self.aug(**results)
+            results = self.aug(**results)
 
-        if 'bboxes' in results:
-            if isinstance(results['bboxes'], list):
-                results['bboxes'] = np.array(
-                    results['bboxes'], dtype=np.float32)
-            results['bboxes'] = results['bboxes'].reshape(-1, 4)
+            if 'bboxes' in results:
+                if isinstance(results['bboxes'], list):
+                    results['bboxes'] = np.array(
+                        results['bboxes'], dtype=np.float32)
+                results['bboxes'] = results['bboxes'].reshape(-1, 4)
 
-            # filter label_fields
-            if self.filter_lost_elements:
+                # filter label_fields
+                if self.filter_lost_elements:
 
-                for label in self.origin_label_fields:
-                    results[label] = np.array(
-                        [results[label][i] for i in results['idx_mapper']])
-                if 'masks' in results:
-                    results['masks'] = np.array(
-                        [results['masks'][i] for i in results['idx_mapper']])
-                    results['masks'] = ori_masks.__class__(
-                        results['masks'], results['image'].shape[0],
-                        results['image'].shape[1])
+                    for label in self.origin_label_fields:
+                        results[label] = np.array(
+                            [results[label][i] for i in results['idx_mapper']])
+                    if 'masks' in results:
+                        results['masks'] = np.array(
+                            [results['masks'][i] for i in results['idx_mapper']])
+                        results['masks'] = ori_masks.__class__(
+                            results['masks'], results['image'].shape[0],
+                            results['image'].shape[1])
 
-                if (not len(results['idx_mapper'])
-                        and self.skip_img_without_anno):
-                    return None
+                    if (not len(results['idx_mapper'])
+                            and self.skip_img_without_anno):
+                        return None
 
-        if 'gt_labels' in results:
-            if isinstance(results['gt_labels'], list):
-                results['gt_labels'] = np.array(results['gt_labels'])
-            results['gt_labels'] = results['gt_labels'].astype(np.int64)
+            if 'gt_labels' in results:
+                if isinstance(results['gt_labels'], list):
+                    results['gt_labels'] = np.array(results['gt_labels'])
+                results['gt_labels'] = results['gt_labels'].astype(np.int64)
 
-        # back to the original format
-        results = self.mapper(results, self.keymap_back)
+            # back to the original format
+            results = self.mapper(results, self.keymap_back)
 
-        # update final shape
-        if self.update_pad_shape:
-            results['pad_shape'] = results['img'].shape
-
-        return results
+            # update final shape
+            if self.update_pad_shape:
+                results['pad_shape'] = results['img'].shape
+            return results
+        except:
+            traceback.print_exc()
+            return res
 
     def __repr__(self):
         repr_str = self.__class__.__name__ + f'(transforms={self.transforms})'
