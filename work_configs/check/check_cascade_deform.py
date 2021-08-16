@@ -1,43 +1,27 @@
 num_classes = 12
+
 # model settings
 model = dict(
     type='CascadeRCNN',
-    pretrained=None,
     backbone=dict(
-        type='DetectoRS_ResNet',
+        type='ResNet',
         depth=50,
+        # groups=32,
+        # base_width=4,
         num_stages=4,
         out_indices=(0, 1, 2, 3),
         frozen_stages=1,
         norm_cfg=dict(type='BN', requires_grad=True),
         norm_eval=True,
         style='pytorch',
-        conv_cfg=dict(type='ConvAWS'),
-        sac=dict(type='SAC', use_deform=True),
-        stage_with_sac=(False, True, True, True),
-        output_img=True),
+        init_cfg=dict(type='Pretrained', checkpoint='torchvision://resnet50'),
+        dcn=dict(type='DCN', deform_groups=1, fallback_on_stride=False),
+        stage_with_dcn=(False, True, True, True)),
     neck=dict(
-        type='RFP',
+        type='FPN',
         in_channels=[256, 512, 1024, 2048],
         out_channels=256,
-        num_outs=5,
-        rfp_steps=2,
-        aspp_out_channels=64,
-        aspp_dilations=(1, 3, 6, 1),
-        rfp_backbone=dict(
-            rfp_inplanes=256,
-            type='DetectoRS_ResNet',
-            depth=50,
-            num_stages=4,
-            out_indices=(0, 1, 2, 3),
-            frozen_stages=1,
-            norm_cfg=dict(type='BN', requires_grad=True),
-            norm_eval=True,
-            conv_cfg=dict(type='ConvAWS'),
-            sac=dict(type='SAC', use_deform=True),
-            stage_with_sac=(False, True, True, True),
-            pretrained=None,
-            style='pytorch')),
+        num_outs=5),
     rpn_head=dict(
         type='RPNHead',
         in_channels=256,
@@ -49,12 +33,11 @@ model = dict(
             strides=[4, 8, 16, 32, 64]),
         bbox_coder=dict(
             type='DeltaXYWHBBoxCoder',
-            target_means=[0.0, 0.0, 0.0, 0.0],
+            target_means=[.0, .0, .0, .0],
             target_stds=[1.0, 1.0, 1.0, 1.0]),
         loss_cls=dict(
             type='CrossEntropyLoss', use_sigmoid=True, loss_weight=1.0),
-        loss_bbox=dict(
-            type='SmoothL1Loss', beta=0.1111111111111111, loss_weight=1.0)),
+        loss_bbox=dict(type='SmoothL1Loss', beta=1.0 / 9.0, loss_weight=1.0)),
     roi_head=dict(
         type='CascadeRoIHead',
         num_stages=3,
@@ -74,7 +57,7 @@ model = dict(
                 num_classes=num_classes,
                 bbox_coder=dict(
                     type='DeltaXYWHBBoxCoder',
-                    target_means=[0.0, 0.0, 0.0, 0.0],
+                    target_means=[0., 0., 0., 0.],
                     target_stds=[0.1, 0.1, 0.2, 0.2]),
                 reg_class_agnostic=True,
                 loss_cls=dict(
@@ -91,7 +74,7 @@ model = dict(
                 num_classes=num_classes,
                 bbox_coder=dict(
                     type='DeltaXYWHBBoxCoder',
-                    target_means=[0.0, 0.0, 0.0, 0.0],
+                    target_means=[0., 0., 0., 0.],
                     target_stds=[0.05, 0.05, 0.1, 0.1]),
                 reg_class_agnostic=True,
                 loss_cls=dict(
@@ -108,7 +91,7 @@ model = dict(
                 num_classes=num_classes,
                 bbox_coder=dict(
                     type='DeltaXYWHBBoxCoder',
-                    target_means=[0.0, 0.0, 0.0, 0.0],
+                    target_means=[0., 0., 0., 0.],
                     target_stds=[0.033, 0.033, 0.067, 0.067]),
                 reg_class_agnostic=True,
                 loss_cls=dict(
@@ -116,7 +99,8 @@ model = dict(
                     use_sigmoid=False,
                     loss_weight=1.0),
                 loss_bbox=dict(type='SmoothL1Loss', beta=1.0, loss_weight=1.0))
-        ]),
+        ],),
+    # model training and testing settings
     train_cfg=dict(
         rpn=dict(
             assigner=dict(
@@ -190,7 +174,7 @@ model = dict(
                 pos_weight=-1,
                 debug=False)
         ]),
-    test_cfg = dict(
+    test_cfg=dict(
         rpn=dict(
             nms_pre=1000,
             max_per_img=1000,
@@ -198,11 +182,12 @@ model = dict(
             min_bbox_size=0),
         rcnn=dict(
             score_thr=0.0001,
-            nms=dict(type='nms', iou_threshold=0.5, min_score=0.0001),
+            nms=dict(type='soft_nms', iou_threshold=0.5, min_score=0.0001),
             max_per_img=100)))
+
+
 dataset_type = 'CocoDataset'
 data_root = 'data/check/'
-# classes = ["phone", "pad", "laptop", "wallet", "packsack"]
 classes = ["knife",
     "scissors",
     "sharpTools",
@@ -215,7 +200,6 @@ classes = ["knife",
     "battery",
     "seal",
     "umbrella"]
-# classes = ["pig"]
 
 albu_train_transforms = [
     dict(type='RandomRotate90', p=0.5),
@@ -230,14 +214,14 @@ train_pipeline = [
     dict(type='LoadAnnotations', with_bbox=True),
     dict(
         type='Resize',
-        img_scale=[(2048, 600), (2048, 1000)],
+        img_scale=[(2048, 800), (2048, 1400)],
         multiscale_mode='range',
         keep_ratio=True),
     dict(type='RandomFlip', flip_ratio=0.5),
     # dict(type='AutoAugmentPolicy', autoaug_type="v1"),
     # dict(type='MixUp'),
-    # dict(type='BoxPaste', objects_from="./data/rich/cuts", sample_thr=0.15, sample_n=2, p=0.8),
-    dict(type="BBoxJitter", min=0.95, max=1.05),
+    # dict(type='BoxPaste', objects_from="./data/check/cuts", sample_thr=0.05, sample_n=5, p=0.8),
+    # dict(type="BBoxJitter", min=0.9, max=1.1),
     dict(type='Normalize', **img_norm_cfg),
     dict(type='Pad', size_divisor=32),
     dict(type='Albu',
@@ -278,14 +262,11 @@ data = dict(
     #         img_prefix=data_root + 'train/images/',
     #         pipeline=train_pipeline),
     train=dict(
-        type='RepeatDataset',
-        times=2,
-        dataset=dict(
             classes=classes,
             type=dataset_type,
             ann_file=data_root + 'train/annotations/train.json',
             img_prefix=data_root + 'train/images/',
-            pipeline=train_pipeline)),
+            pipeline=train_pipeline),
     val=dict(
             classes=classes,
             type=dataset_type,
@@ -306,7 +287,7 @@ data = dict(
             pipeline=test_pipeline)
 )
 
-work_dir = './work_dirs/check/drs_2x_6bs_bj_ssrot_all'
+work_dir = './work_dirs/check/dcn50_2x_6bs_8_14_ssrot_all'
 evaluation = dict(
     classwise=True, 
     interval=12, 
@@ -330,33 +311,8 @@ checkpoint_config = dict(interval=total_epochs)
 log_config = dict(interval=50, hooks=[dict(type='TextLoggerHook')])
 dist_params = dict(backend='nccl')
 log_level = 'INFO'
-load_from = './weights/detectors_htc_r50_1x_coco-329b1453.pth'
+load_from = './weights/cascade_rcnn_r50_fpn_dconv_c3-c5_1x_coco_20200130-2f1fca44.pth'
 resume_from = None
 workflow = [('train', 1)]
 fp16 = dict(loss_scale=512.0)
-# gpu_ids=(2,3)
 
-
-# only_swa_training = False
-# # whether to perform swa training
-# swa_training = True
-# # load the best pre_trained model as the starting model for swa training
-# swa_load_from = work_dir + '/epoch_12.pth'
-# swa_resume_from = None
-
-# # swa optimizer
-# swa_optimizer = dict(type='SGD', lr=0.01, momentum=0.9, weight_decay=0.0001)
-# swa_optimizer_config = dict(grad_clip=None)
-
-# # swa learning policy
-# swa_lr_config = dict(
-#     policy='cyclic',
-#     target_ratio=(1, 0.01),
-#     cyclic_times=12,
-#     step_ratio_up=0.0)
-# swa_runner = dict(type='EpochBasedRunner', max_epochs=12)
-# # the epoch interval to perform swa
-# swa_interval = 1
-
-# # swa checkpoint setting
-# swa_checkpoint_config = dict(interval=1, filename_tmpl='swa_epoch_{}.pth')
