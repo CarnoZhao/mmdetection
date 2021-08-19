@@ -217,9 +217,9 @@ classes = ["phone", "pad", "laptop", "wallet", "packsack"]
 #     "seal",
 #     "umbrella"]
 # classes = ["pig"]
-
 albu_train_transforms = [
-    dict(type='RandomRotate90', p=0.5)
+    dict(type='RandomRotate90', p=0.5),
+    dict(type='Cutout', p=0.5)
 ]
 
 img_norm_cfg = dict(
@@ -227,12 +227,12 @@ img_norm_cfg = dict(
 train_pipeline = [
     dict(type='LoadImageFromFile'),
     dict(type='LoadAnnotations', with_bbox=True),
-    dict(type='Resize', img_scale=[(2000, 720), (2000, 896)], keep_ratio=True),
+    dict(type='Resize', img_scale=[(4000, 720), (4000, 1200)], keep_ratio=True),
     dict(type='RandomFlip', flip_ratio=0.5),
     dict(type='AutoAugmentPolicy', autoaug_type="v1"),
     # dict(type='MixUp'),
-    dict(type='BoxPaste', objects_from="./data/rich/cuts", sample_thr=0.15, sample_n=2, p=0.8),
-    # dict(type="BBoxJitter", min=0.98, max=1.02),
+    # dict(type='BoxPaste', objects_from="./data/rich/cuts", sample_thr=0.15, sample_n=2, p=0.8),
+    dict(type="BBoxJitter", min=0.95, max=1.05),
     dict(type='Normalize', **img_norm_cfg),
     dict(type='Pad', size_divisor=32),
     dict(type='Albu',
@@ -264,7 +264,7 @@ test_pipeline = [
         ])
 ]
 data = dict(
-    samples_per_gpu=3,
+    samples_per_gpu=2,
     workers_per_gpu=2,
     # train=dict(
     #         classes=classes,
@@ -298,14 +298,19 @@ data = dict(
             pipeline=test_pipeline)
 )
 
-work_dir = './work_dirs/rich/drs_12e_6bs_aav1_rot_bp_all_wswa'
+work_dir = './work_dirs/rich/drs_1x_6bs_aav1_rot_co_bj_720_1200_swa'
 evaluation = dict(
     classwise=True, 
     interval=12, 
     metric='bbox',
     jsonfile_prefix=f"{work_dir}/valid")
-optimizer = dict(type='SGD', lr=0.01, momentum=0.9, weight_decay=0.0001)
-optimizer_config = dict(grad_clip=dict(max_norm=35, norm_type=2))
+optimizer = dict(
+    type='SGD_GC',
+    lr=0.01,
+    momentum=0.9,
+    weight_decay=0.0001,
+    paramwise_cfg=dict(bias_lr_mult=2.0, bias_decay_mult=0.0))
+optimizer_config = dict(grad_clip=None)
 lr_config = dict(
     policy='step',
     warmup='linear',
