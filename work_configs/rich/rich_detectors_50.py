@@ -145,9 +145,9 @@ model = dict(
             dict(
                 assigner=dict(
                     type='MaxIoUAssigner',
-                    pos_iou_thr=0.5,
-                    neg_iou_thr=0.5,
-                    min_pos_iou=0.5,
+                    pos_iou_thr=0.55,
+                    neg_iou_thr=0.55,
+                    min_pos_iou=0.55,
                     match_low_quality=False,
                     ignore_iof_thr=-1),
                 sampler=dict(
@@ -161,9 +161,9 @@ model = dict(
             dict(
                 assigner=dict(
                     type='MaxIoUAssigner',
-                    pos_iou_thr=0.6,
-                    neg_iou_thr=0.6,
-                    min_pos_iou=0.6,
+                    pos_iou_thr=0.65,
+                    neg_iou_thr=0.65,
+                    min_pos_iou=0.65,
                     match_low_quality=False,
                     ignore_iof_thr=-1),
                 sampler=dict(
@@ -177,9 +177,9 @@ model = dict(
             dict(
                 assigner=dict(
                     type='MaxIoUAssigner',
-                    pos_iou_thr=0.7,
-                    neg_iou_thr=0.7,
-                    min_pos_iou=0.7,
+                    pos_iou_thr=0.75,
+                    neg_iou_thr=0.75,
+                    min_pos_iou=0.75,
                     match_low_quality=False,
                     ignore_iof_thr=-1),
                 sampler=dict(
@@ -218,7 +218,9 @@ classes = ["phone", "pad", "laptop", "wallet", "packsack"]
 #     "umbrella"]
 # classes = ["pig"]
 albu_train_transforms = [
-    dict(type='RandomRotate90', p=0.5),
+    # dict(type='RandomRotate90', p=0.5),
+    # dict(type='VerticalFlip', p=0.5),
+    # dict(type='ShiftScaleRotate', shift_limit=0.0625, scale_limit=0.5, rotate_limit=30, interpolation=1, p=0.5),
     dict(type='Cutout', p=0.5)
 ]
 
@@ -227,7 +229,7 @@ img_norm_cfg = dict(
 train_pipeline = [
     dict(type='LoadImageFromFile'),
     dict(type='LoadAnnotations', with_bbox=True),
-    dict(type='Resize', img_scale=[(4000, 720), (4000, 1200)], keep_ratio=True),
+    dict(type='Resize', img_scale=[(4000, 800), (4000, 1400)], keep_ratio=True),
     dict(type='RandomFlip', flip_ratio=0.5),
     dict(type='AutoAugmentPolicy', autoaug_type="v1"),
     # dict(type='MixUp'),
@@ -252,7 +254,7 @@ test_pipeline = [
     dict(type='LoadImageFromFile'),
     dict(
         type='MultiScaleFlipAug',
-        img_scale=[(2000, 720), (2000, 800), (2000, 896)],
+        img_scale=[(4000, 800), (4000, 1000), (4000, 1200)],
         flip=True,
         transforms=[
             dict(type='Resize', keep_ratio=True),
@@ -264,7 +266,7 @@ test_pipeline = [
         ])
 ]
 data = dict(
-    samples_per_gpu=2,
+    samples_per_gpu=1,
     workers_per_gpu=2,
     # train=dict(
     #         classes=classes,
@@ -273,11 +275,14 @@ data = dict(
     #         img_prefix=data_root + 'train/images/',
     #         pipeline=train_pipeline),
     train=dict(
+        type='RepeatDataset',
+        times=1,
+        dataset=dict(
             classes=classes,
             type=dataset_type,
             ann_file=data_root + 'train/annotations/train.json',
             img_prefix=data_root + 'train/images/',
-            pipeline=train_pipeline),
+            pipeline=train_pipeline)),
     val=dict(
             classes=classes,
             type=dataset_type,
@@ -293,12 +298,12 @@ data = dict(
     test=dict(
             classes=classes,
             type=dataset_type,
-            ann_file=data_root + 'test_A/annotations/test.json',
-            img_prefix=data_root + 'test_A/images/',
+            ann_file=data_root + 'test_B/annotations/test.json',
+            img_prefix=data_root + 'test_B/images/',
             pipeline=test_pipeline)
 )
 
-work_dir = './work_dirs/rich/drs_1x_6bs_aav1_rot_co_bj_720_1200_swa'
+work_dir = './work_dirs/rich/drs_1x_9bs_gacc_aav1_co_bj_800_1400_swa'
 evaluation = dict(
     classwise=True, 
     interval=12, 
@@ -306,11 +311,11 @@ evaluation = dict(
     jsonfile_prefix=f"{work_dir}/valid")
 optimizer = dict(
     type='SGD_GC',
-    lr=0.01,
+    lr=0.0025 * 9,
     momentum=0.9,
     weight_decay=0.0001,
     paramwise_cfg=dict(bias_lr_mult=2.0, bias_decay_mult=0.0))
-optimizer_config = dict(grad_clip=None)
+optimizer_config = dict(grad_clip=None, cumulative_iters=3)
 lr_config = dict(
     policy='step',
     warmup='linear',

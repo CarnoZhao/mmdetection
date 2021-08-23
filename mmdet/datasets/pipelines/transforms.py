@@ -85,12 +85,15 @@ class BoxPaste(object):
                     cut = cut[::-1]
                 if random.random() < self.hflip:
                     cut = cut[:,::-1]
-                start_x = np.random.randint(0, img.shape[1] - w)
-                start_y = np.random.randint(0, img.shape[0] - h)
-                img[start_y:start_y + h, start_x:start_x + w] = img[start_y:start_y + h, start_x:start_x + w] // 2 + cut // 2
-                new_box = np.array([[start_x, start_y, start_x + w, start_y + h]]).astype(boxes.dtype)
-                boxes = np.concatenate([boxes, new_box])
-                labels = np.concatenate([labels, [self.classes[class_idx[i]] - 1]])
+                try:
+                    start_x = np.random.randint(0, img.shape[1] - w)
+                    start_y = np.random.randint(0, img.shape[0] - h)
+                    img[start_y:start_y + h, start_x:start_x + w] = img[start_y:start_y + h, start_x:start_x + w] // 2 + cut // 2
+                    new_box = np.array([[start_x, start_y, start_x + w, start_y + h]]).astype(boxes.dtype)
+                    boxes = np.concatenate([boxes, new_box])
+                    labels = np.concatenate([labels, [self.classes[class_idx[i]] - 1]])
+                except:
+                    continue
             results['img'] = img
             results['gt_bboxes'] = boxes
             results['gt_labels'] = labels
