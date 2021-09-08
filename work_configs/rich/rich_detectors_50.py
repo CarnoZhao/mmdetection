@@ -145,9 +145,9 @@ model = dict(
             dict(
                 assigner=dict(
                     type='MaxIoUAssigner',
-                    pos_iou_thr=0.55,
-                    neg_iou_thr=0.55,
-                    min_pos_iou=0.55,
+                    pos_iou_thr=0.5,
+                    neg_iou_thr=0.5,
+                    min_pos_iou=0.5,
                     match_low_quality=False,
                     ignore_iof_thr=-1),
                 sampler=dict(
@@ -161,9 +161,9 @@ model = dict(
             dict(
                 assigner=dict(
                     type='MaxIoUAssigner',
-                    pos_iou_thr=0.65,
-                    neg_iou_thr=0.65,
-                    min_pos_iou=0.65,
+                    pos_iou_thr=0.6,
+                    neg_iou_thr=0.6,
+                    min_pos_iou=0.6,
                     match_low_quality=False,
                     ignore_iof_thr=-1),
                 sampler=dict(
@@ -177,9 +177,9 @@ model = dict(
             dict(
                 assigner=dict(
                     type='MaxIoUAssigner',
-                    pos_iou_thr=0.75,
-                    neg_iou_thr=0.75,
-                    min_pos_iou=0.75,
+                    pos_iou_thr=0.7,
+                    neg_iou_thr=0.7,
+                    min_pos_iou=0.7,
                     match_low_quality=False,
                     ignore_iof_thr=-1),
                 sampler=dict(
@@ -218,7 +218,7 @@ classes = ["phone", "pad", "laptop", "wallet", "packsack"]
 #     "umbrella"]
 # classes = ["pig"]
 albu_train_transforms = [
-    # dict(type='RandomRotate90', p=0.5),
+    dict(type='RandomRotate90', p=0.5),
     # dict(type='VerticalFlip', p=0.5),
     # dict(type='ShiftScaleRotate', shift_limit=0.0625, scale_limit=0.5, rotate_limit=30, interpolation=1, p=0.5),
     dict(type='Cutout', p=0.5)
@@ -234,7 +234,7 @@ train_pipeline = [
     dict(type='AutoAugmentPolicy', autoaug_type="v1"),
     # dict(type='MixUp'),
     # dict(type='BoxPaste', objects_from="./data/rich/cuts", sample_thr=0.15, sample_n=2, p=0.8),
-    dict(type="BBoxJitter", min=0.95, max=1.05),
+    dict(type='BBoxJitter', min=0.95, max=1.05),
     dict(type='Normalize', **img_norm_cfg),
     dict(type='Pad', size_divisor=32),
     dict(type='Albu',
@@ -254,7 +254,7 @@ test_pipeline = [
     dict(type='LoadImageFromFile'),
     dict(
         type='MultiScaleFlipAug',
-        img_scale=[(4000, 800), (4000, 1000), (4000, 1200)],
+        img_scale=[(4000, 800), (4000, 1100), (4000, 1400)],
         flip=True,
         transforms=[
             dict(type='Resize', keep_ratio=True),
@@ -275,19 +275,19 @@ data = dict(
     #         img_prefix=data_root + 'train/images/',
     #         pipeline=train_pipeline),
     train=dict(
-        type='RepeatDataset',
-        times=1,
-        dataset=dict(
-            classes=classes,
-            type=dataset_type,
-            ann_file=data_root + 'train/annotations/train.json',
-            img_prefix=data_root + 'train/images/',
-            pipeline=train_pipeline)),
+            type='RepeatDataset',
+            times=1,
+            dataset=dict(
+                classes=classes,
+                type=dataset_type,
+                ann_file=data_root + 'train_C/annotations/train.json',
+                img_prefix=data_root + 'train_C/images/',
+                pipeline=train_pipeline)),
     val=dict(
             classes=classes,
             type=dataset_type,
-            ann_file=data_root + 'train/jsons/valid_fold_0.json',
-            img_prefix=data_root + 'train/images/',
+            ann_file=data_root + 'train_B/annotations/train.json',
+            img_prefix=data_root + 'train_B/images/',
             pipeline=test_pipeline),
     # test=dict(
     #         classes=classes,
@@ -298,12 +298,12 @@ data = dict(
     test=dict(
             classes=classes,
             type=dataset_type,
-            ann_file=data_root + 'test_B/annotations/test.json',
-            img_prefix=data_root + 'test_B/images/',
+            ann_file=data_root + 'test_C/annotations/test.json',
+            img_prefix=data_root + 'test_C/images/',
             pipeline=test_pipeline)
 )
 
-work_dir = './work_dirs/rich/drs_1x_9bs_gacc_aav1_co_bj_800_1400_swa'
+work_dir = './work_dirs/rich/drs_1x_9bs_gacc_aav1_rot_co_bj_800_1400_swa_new2x'
 evaluation = dict(
     classwise=True, 
     interval=12, 
