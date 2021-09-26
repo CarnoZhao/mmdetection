@@ -49,7 +49,7 @@ model = dict(
             roi_layer=dict(type='RoIAlign', output_size=7, sampling_ratio=0),
             out_channels=256,
             featmap_strides=[4, 8, 16, 32],
-            add_context=True),
+            add_context=False),
         bbox_head=[
             dict(
                 type='ConvFCBBoxHead',
@@ -195,7 +195,7 @@ model = dict(
             min_bbox_size=0),
         rcnn=dict(
             score_thr=0.0001,
-            nms=dict(type='nms', iou_threshold=0.5),
+            nms=dict(type='soft_nms', iou_threshold=0.5, min_score=0.0001),
             max_per_img=100)))
 
 dataset_type = 'CocoDataset'
@@ -203,8 +203,8 @@ data_root = 'data/rich/'
 classes = ["phone", "pad", "laptop", "wallet", "packsack"]
 
 albu_train_transforms = [
-    # dict(type='RandomRotate90', p=0.5),
-    # dict(type='Cutout', p=0.5)
+    dict(type='RandomRotate90', p=0.5),
+    dict(type='Cutout', p=0.5)
 ]
 
 img_norm_cfg = dict(
@@ -215,7 +215,7 @@ train_pipeline = [
     dict(type='Resize', img_scale=[(4000, 800), (4000, 1400)], keep_ratio=True),
     dict(type='RandomFlip', flip_ratio=0.5),
     dict(type='AutoAugmentPolicy', autoaug_type="v1"),
-    # dict(type='BBoxJitter', min=0.95, max=1.05),
+    dict(type='BBoxJitter', min=0.95, max=1.05),
     dict(type='Normalize', **img_norm_cfg),
     dict(type='Pad', size_divisor=32),
     dict(type='Albu',
@@ -284,7 +284,7 @@ data = dict(
             pipeline=test_pipeline)
 )
 
-work_dir = './work_dirs/rich/swb_2x_9bs_gc_aav1_800_1400_trainC'
+work_dir = './work_dirs/rich/swb_2x_9bs_nogc_rot_co_bj_aav1_800_1400_trainC'
 evaluation = dict(
     classwise=True, 
     interval=12, 
