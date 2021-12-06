@@ -389,3 +389,17 @@ class MultiImageMixDataset:
         """
         assert isinstance(dynamic_scale, tuple)
         self._dynamic_scale = dynamic_scale
+
+@DATASETS.register_module()
+class DownSampleCocoDataset(CocoDataset):
+    def __init__(self, downsample = 1, **kwargs):
+        self.downsample = downsample
+        super(DownSampleCocoDataset, self).__init__(**kwargs)
+        self.orig_len = super().__len__()
+
+    def __len__(self):
+        return super().__len__() // self.downsample
+
+    def __getitem__(self, idx):
+        idx = np.random.randint(0, self.orig_len)
+        return super().__getitem__(idx)

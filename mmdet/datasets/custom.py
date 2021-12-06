@@ -1,6 +1,9 @@
 import os.path as osp
 import warnings
+import logging
+import itertools
 from collections import OrderedDict
+from pycocotools.cocoeval import COCOeval
 
 import mmcv
 import numpy as np
@@ -365,3 +368,4 @@ class CustomDataset(Dataset):
         table = AsciiTable(table_data)
         result += table.table
         return result
+
