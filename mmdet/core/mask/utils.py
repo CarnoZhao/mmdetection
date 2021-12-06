@@ -48,6 +48,8 @@ def encode_mask_results(mask_results):
         cls_segms, cls_mask_scores = mask_results
     else:
         cls_segms = mask_results
+    if isinstance(cls_segms, list) and isinstance(cls_segms[0], list) and len(cls_segms[0]) != 0 and isinstance(cls_segms[0][0], list):
+        cls_segms = cls_segms[0]
     num_classes = len(cls_segms)
     encoded_mask_results = [[] for _ in range(num_classes)]
     for i in range(len(cls_segms)):
