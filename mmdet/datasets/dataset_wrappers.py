@@ -398,7 +398,7 @@ class DownSampleCocoDataset(CocoDataset):
         self.orig_len = super().__len__()
 
     def __len__(self):
-        return super().__len__() // self.downsample
+        return int(round(super().__len__() / self.downsample))
 
     def __getitem__(self, idx):
         idx = np.random.randint(0, self.orig_len)
