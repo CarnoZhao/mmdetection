@@ -82,7 +82,10 @@ def multiclass_nms(multi_bboxes,
         else:
             return dets, labels
 
-    dets, keep = batched_nms(bboxes, scores, labels, nms_cfg)
+    if nms_cfg["type"] == "weighted_cluster_nms":
+        dets, labels, keep = weighted_cluster_nms(bboxes, scores, labels, nms_cfg)
+    else:
+        dets, keep = batched_nms(bboxes, scores, labels, nms_cfg)
 
     if max_num > 0:
         dets = dets[:max_num]
@@ -168,3 +171,94 @@ def fast_nms(multi_bboxes,
 
     cls_dets = torch.cat([boxes, scores[:, None]], dim=1)
     return cls_dets, classes, coeffs
+
+
+def box_diou(boxes1, boxes2):
+    def box_area(box):
+        # box = 4xn
+        return (box[2] - box[0]) * (box[3] - box[1])
+
+    area1 = box_area(boxes1.t())
+    area2 = box_area(boxes2.t())
+
+    lt = torch.max(boxes1[:, None, :2], boxes2[:, :2])  # [N,M,2]
+    rb = torch.min(boxes1[:, None, 2:], boxes2[:, 2:])  # [N,M,2]
+    clt = torch.min(boxes1[:, None, :2], boxes2[:, :2])
+    crb = torch.max(boxes1[:, None, 2:], boxes2[:, 2:])
+    x1 = (boxes1[:, None, 0] + boxes1[:, None, 2]) / 2
+    y1 = (boxes1[:, None, 1] + boxes1[:, None, 3]) / 2
+    x2 = (boxes2[:, None, 0] + boxes2[:, None, 2]) / 2
+    y2 = (boxes2[:, None, 1] + boxes2[:, None, 3]) / 2
+    d = (x1 - x2.t()) ** 2 + (y1 - y2.t()) ** 2
+    c = ((crb - clt) ** 2).sum(dim = 2)
+
+    inter = (rb - lt).clamp(min = 0).prod(2)  # [N,M]
+    return inter / (area1[:, None] + area2 - inter) - (d / c) ** 0.6 
+
+def box_iou(boxes1, boxes2):
+    def box_area(box):
+        # box = 4xn
+        return (box[2] - box[0]) * (box[3] - box[1])
+
+    area1 = box_area(boxes1.t())
+    area2 = box_area(boxes2.t())
+
+    lt = torch.max(boxes1[:, None, :2], boxes2[:, :2])  # [N,M,2]
+    rb = torch.min(boxes1[:, None, 2:], boxes2[:, 2:])  # [N,M,2]
+
+    inter = (rb - lt).clamp(min = 0).prod(2)  # [N,M]
+    return inter / (area1[:, None] + area2 - inter) 
+
+def weighted_cluster_nms(boxes, scores, idxs, nms_cfg):
+    nms_cfg_ = nms_cfg.copy()
+    n = len(scores)
+    scores, idx = scores.sort(descending = True)
+    boxes = boxes[idx]
+    idxs = idxs[idx]
+
+    class_agnostic = nms_cfg_.pop('class_agnostic', False)
+    if class_agnostic:
+        boxes_for_nms = boxes
+    else:
+        max_coordinate = boxes.max()
+        offsets = idxs.to(boxes) * (max_coordinate + torch.tensor(1).to(boxes))
+        boxes_for_nms = boxes + offsets[:, None]
+
+    iou_threshold = nms_cfg_.pop("iou_threshold", 0.5)
+    iou_method = nms_cfg_.pop("iou_method", "iou")
+    iou_method = eval("box_" + iou_method)
+    
+    iou = iou_method(boxes_for_nms, boxes_for_nms).triu_(diagonal = 1)  # IoU矩阵，上三角化
+    C = iou
+    for _ in range(200):    
+        A = C
+        maxA = A.max(dim = 0)[0]   # 列最大值向量
+        E = (maxA < iou_threshold).float().unsqueeze(1).expand_as(A)   # 对角矩阵E的替代
+        C = iou.mul(E)     # 按元素相乘
+        if A.equal(C) == True:     # 终止条件
+            break
+    keep = torch.arange(n)[maxA < iou_threshold]  # 列最大值向量，二值化
+    weights = (C * (C > iou_threshold).float() + torch.eye(n).cuda()) * (scores.reshape((1, n)))
+
+    xx1 = boxes[:, 0].expand(n, n)
+    yy1 = boxes[:, 1].expand(n, n)
+    xx2 = boxes[:, 2].expand(n, n)
+    yy2 = boxes[:, 3].expand(n, n)
+
+    weightsum = weights.sum(dim = 1)         # 坐标加权平均
+    xx1 = (xx1 * weights).sum(dim = 1) / weightsum
+    yy1 = (yy1 * weights).sum(dim = 1) / weightsum
+    xx2 = (xx2 * weights).sum(dim = 1) / weightsum
+    yy2 = (yy2 * weights).sum(dim = 1) / weightsum
+    boxes = torch.stack([xx1, yy1, xx2, yy2], 1)
+
+    boxes = boxes[keep]
+    scores = scores[keep]
+
+    max_num = nms_cfg_.pop('max_num', -1)
+    if max_num > 0:
+        keep = keep[:max_num]
+        boxes = boxes[:max_num]
+        scores = scores[:max_num]
+
+    return torch.cat([boxes, scores[:, None]], -1), idxs, keep
