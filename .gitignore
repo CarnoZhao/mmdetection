@@ -4,12 +4,12 @@
 tmp*
 __pycache__/
 run.sh
-*.ipynb
 work_images
 nohup.out
 submission.json
 *.py[cod]
 *$py.class
+demo/
 
 # C extensions
 *.so
