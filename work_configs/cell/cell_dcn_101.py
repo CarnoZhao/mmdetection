@@ -1,47 +1,27 @@
 num_classes = 3
+
 # model settings
 model = dict(
-    type='HybridTaskCascade',
+    type='CascadeRCNN',
     backbone=dict(
-        type='DetectoRS_ResNeXt',
-        depth=50,
-        groups=32,
-        base_width=4,
+        type='ResNet',
+        depth=101,
+        # groups=32,
+        # base_width=4,
         num_stages=4,
         out_indices=(0, 1, 2, 3),
         frozen_stages=1,
-        norm_cfg=dict(type='BN', requires_grad=True),
+        norm_cfg=dict(type='SyncBN', requires_grad=True),
         norm_eval=True,
         style='pytorch',
-        conv_cfg=dict(type='ConvAWS'),
-        sac=dict(type='SAC', use_deform=True),
-        stage_with_sac=(False, True, True, True),
-        output_img=True,
-        pretrained='open-mmlab://resnext50_32x4d'),
+        init_cfg=dict(type='Pretrained', checkpoint='torchvision://resnet101'),
+        dcn=dict(type='DCN', deform_groups=1, fallback_on_stride=False),
+        stage_with_dcn=(False, True, True, True)),
     neck=dict(
-        type='RFP',
+        type='FPN',
         in_channels=[256, 512, 1024, 2048],
         out_channels=256,
-        num_outs=5,
-        rfp_steps=2,
-        aspp_out_channels=64,
-        aspp_dilations=(1, 3, 6, 1),
-        rfp_backbone=dict(
-            rfp_inplanes=256,
-            type='DetectoRS_ResNeXt',
-            depth=50,
-            groups=32,
-            base_width=4,
-            num_stages=4,
-            out_indices=(0, 1, 2, 3),
-            frozen_stages=1,
-            norm_cfg=dict(type='BN', requires_grad=True),
-            norm_eval=True,
-            conv_cfg=dict(type='ConvAWS'),
-            sac=dict(type='SAC', use_deform=True),
-            stage_with_sac=(False, True, True, True),
-            pretrained='open-mmlab://resnext50_32x4d',
-            style='pytorch')),
+        num_outs=5),
     rpn_head=dict(
         type='RPNHead',
         in_channels=256,
@@ -59,9 +39,7 @@ model = dict(
             type='CrossEntropyLoss', use_sigmoid=True, loss_weight=1.0),
         loss_bbox=dict(type='SmoothL1Loss', beta=1.0 / 9.0, loss_weight=1.0)),
     roi_head=dict(
-        type='HybridTaskCascadeRoIHead',
-        interleaved=True,
-        mask_info_flow=True,
+        type='CascadeRoIHead',
         num_stages=3,
         stage_loss_weights=[1, 0.5, 0.25],
         bbox_roi_extractor=dict(
@@ -79,7 +57,7 @@ model = dict(
                 bbox_coder=dict(
                     type='DeltaXYWHBBoxCoder',
                     target_means=[0., 0., 0., 0.],
-                     target_stds=[0.1, 0.1, 0.2, 0.2]),
+                    target_stds=[0.1, 0.1, 0.2, 0.2]),
                 reg_class_agnostic=True,
                 loss_cls=dict(
                     type='CrossEntropyLoss',
@@ -126,33 +104,14 @@ model = dict(
             roi_layer=dict(type='RoIAlign', output_size=14, sampling_ratio=0),
             out_channels=256,
             featmap_strides=[4, 8, 16, 32]),
-        mask_head=[
-            dict(
-                type='HTCMaskHead',
-                with_conv_res=False,
-                num_convs=4,
-                in_channels=256,
-                conv_out_channels=256,
-                num_classes=num_classes,
-                loss_mask=dict(
-                    type='CrossEntropyLoss', use_mask=True, loss_weight=1.0)),
-            dict(
-                type='HTCMaskHead',
-                num_convs=4,
-                in_channels=256,
-                conv_out_channels=256,
-                num_classes=num_classes,
-                loss_mask=dict(
-                    type='CrossEntropyLoss', use_mask=True, loss_weight=1.0)),
-            dict(
-                type='HTCMaskHead',
-                num_convs=4,
-                in_channels=256,
-                conv_out_channels=256,
-                num_classes=num_classes,
-                loss_mask=dict(
-                    type='CrossEntropyLoss', use_mask=True, loss_weight=1.0))
-        ]),
+        mask_head=dict(
+            type='FCNMaskHead',
+            num_convs=4,
+            in_channels=256,
+            conv_out_channels=256,
+            num_classes=num_classes,
+            loss_mask=dict(
+                type='CrossEntropyLoss', use_mask=True, loss_weight=1.0))),
     # model training and testing settings
     train_cfg=dict(
         rpn=dict(
@@ -242,6 +201,7 @@ model = dict(
             max_per_img=1000,
             mask_thr_binary=0.5)))
 
+
 dataset_type = 'CocoDataset'
 data_root = 'data/cell/'
 classes = ['shsy5y', 'astro', 'cort']
@@ -297,34 +257,33 @@ test_pipeline = [
 ]
 holdout = 0
 data = dict(
-    samples_per_gpu=3,
+    samples_per_gpu=4,
     workers_per_gpu=2,
     train=[dict(
             classes=classes,
-            type="DownSampleCocoDataset",
-            downsample=2,
-            ann_file=data_root + f'train_tiny/annotations/fold_{fold}.json',
-            img_prefix=data_root + 'train_tiny/images/',
+            type=dataset_type,
+            ann_file=data_root + f'train_small/annotations/fold_{fold}.json',
+            img_prefix=data_root + 'train_small/images/',
             pipeline=train_pipeline) for fold in range(5)], # if fold != holdout],
     val=dict(
             classes=classes,
             type=dataset_type,
-            ann_file=data_root + f'train_tiny/annotations/fold_{holdout}.json',
-            img_prefix=data_root + 'train_tiny/images/',
+            ann_file=data_root + f'train_small/annotations/fold_{holdout}.json',
+            img_prefix=data_root + 'train_small/images/',
             pipeline=test_pipeline),
     test=dict(
             classes=classes,
             type=dataset_type,
-            ann_file=data_root + 'train_tiny/annotations/fold_0.json',
-            img_prefix=data_root + 'train_tiny/images/',
+            ann_file=data_root + 'train_small/annotations/train.json',
+            img_prefix=data_root + 'train_small/images/',
             pipeline=test_pipeline)
 )
 
 nx = 1
-work_dir = f'./work_dirs/cell/drsx50_{nx}x_hvflip_rot90_tiny_d2_all'
+work_dir = f'./work_dirs/cell/dcn101_{nx}x_hvflip_rot90_small_all'
 evaluation = dict(
-    classwise=True,
-    interval=12,
+    classwise=True, 
+    interval=12, 
     metric=['bbox', 'segm'],
     jsonfile_prefix=f"{work_dir}/valid")
 optimizer = dict(type='SGD', lr=0.01, momentum=0.9, weight_decay=0.0001)
@@ -342,11 +301,10 @@ checkpoint_config = dict(interval=total_epochs, save_optimizer=False)
 log_config = dict(interval=50, hooks=[dict(type='TextLoggerHook')])
 dist_params = dict(backend='nccl')
 log_level = 'INFO'
-load_from = None # './weights/detectors_htc_r50_1x_coco-329b1453.pth'
+load_from = './weights/cascade_mask_rcnn_r101_fpn_dconv_c3-c5_1x_coco_20200204-df0c5f10.pth'
 resume_from = None
 workflow = [('train', 1)]
 fp16 = dict(loss_scale=512.0)
-
 
 only_swa_training = False
 # whether to perform swa training

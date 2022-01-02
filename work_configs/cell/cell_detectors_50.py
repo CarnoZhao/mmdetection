@@ -296,7 +296,8 @@ data = dict(
     workers_per_gpu=2,
     train=[dict(
             classes=classes,
-            type=dataset_type,
+            type="DownSampleCocoDataset",
+            downsample=2,
             ann_file=data_root + f'train_tiny/annotations/fold_{fold}.json',
             img_prefix=data_root + 'train_tiny/images/',
             pipeline=train_pipeline) for fold in range(5)], # if fold != holdout],
@@ -315,10 +316,10 @@ data = dict(
 )
 
 nx = 1
-work_dir = f'./work_dirs/cell/drs_{nx}x_hvflip_rot90_tiny_all'
+work_dir = f'./work_dirs/cell/drs_{nx}x_hvflip_rot90_tiny_d2_all'
 evaluation = dict(
-    classwise=True, 
-    interval=12, 
+    classwise=True,
+    interval=12,
     metric=['bbox', 'segm'],
     jsonfile_prefix=f"{work_dir}/valid")
 optimizer = dict(type='SGD', lr=0.01, momentum=0.9, weight_decay=0.0001)
@@ -340,7 +341,6 @@ load_from = './weights/detectors_htc_r50_1x_coco-329b1453.pth'
 resume_from = None
 workflow = [('train', 1)]
 fp16 = dict(loss_scale=512.0)
-gpu_ids=(2,3)
 
 
 only_swa_training = False

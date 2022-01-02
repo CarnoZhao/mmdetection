@@ -1,43 +1,29 @@
-num_classes = 5
-# model settings
+num_classes = 1
+
 model = dict(
     type='CascadeRCNN',
     pretrained=None,
     backbone=dict(
-        type='DetectoRS_ResNet',
-        depth=50,
-        num_stages=4,
+        type='SwinTransformer',
+        embed_dim=96,
+        depths=[2, 2, 18, 2],
+        num_heads=[3, 6, 12, 24],
+        window_size=7,
+        mlp_ratio=4.,
+        qkv_bias=True,
+        qk_scale=None,
+        drop_rate=0.,
+        attn_drop_rate=0.,
+        drop_path_rate=0.2,
+        ape=False,
+        patch_norm=True,
         out_indices=(0, 1, 2, 3),
-        frozen_stages=1,
-        norm_cfg=dict(type='BN', requires_grad=True),
-        norm_eval=True,
-        style='pytorch',
-        conv_cfg=dict(type='ConvAWS'),
-        sac=dict(type='SAC', use_deform=True),
-        stage_with_sac=(False, True, True, True),
-        output_img=True),
+        use_checkpoint=False),
     neck=dict(
-        type='RFP',
-        in_channels=[256, 512, 1024, 2048],
+        type='FPN',
+        in_channels=[96, 192, 384, 768],
         out_channels=256,
-        num_outs=5,
-        rfp_steps=2,
-        aspp_out_channels=64,
-        aspp_dilations=(1, 3, 6, 1),
-        rfp_backbone=dict(
-            rfp_inplanes=256,
-            type='DetectoRS_ResNet',
-            depth=50,
-            num_stages=4,
-            out_indices=(0, 1, 2, 3),
-            frozen_stages=1,
-            norm_cfg=dict(type='BN', requires_grad=True),
-            norm_eval=True,
-            conv_cfg=dict(type='ConvAWS'),
-            sac=dict(type='SAC', use_deform=True),
-            stage_with_sac=(False, True, True, True),
-            pretrained=None,
-            style='pytorch')),
+        num_outs=5),
     rpn_head=dict(
         type='RPNHead',
         in_channels=256,
@@ -49,12 +35,11 @@ model = dict(
             strides=[4, 8, 16, 32, 64]),
         bbox_coder=dict(
             type='DeltaXYWHBBoxCoder',
-            target_means=[0.0, 0.0, 0.0, 0.0],
+            target_means=[.0, .0, .0, .0],
             target_stds=[1.0, 1.0, 1.0, 1.0]),
         loss_cls=dict(
             type='CrossEntropyLoss', use_sigmoid=True, loss_weight=1.0),
-        loss_bbox=dict(
-            type='SmoothL1Loss', beta=0.1111111111111111, loss_weight=1.0)),
+        loss_bbox=dict(type='SmoothL1Loss', beta=1.0 / 9.0, loss_weight=1.0)),
     roi_head=dict(
         type='CascadeRoIHead',
         num_stages=3,
@@ -64,61 +49,67 @@ model = dict(
             roi_layer=dict(type='RoIAlign', output_size=7, sampling_ratio=0),
             out_channels=256,
             featmap_strides=[4, 8, 16, 32],
-            # add_context=False,
-            ),
+            add_context=False),
         bbox_head=[
             dict(
-                type='Shared2FCBBoxHead',
+                type='ConvFCBBoxHead',
+                num_shared_convs=4,
+                num_shared_fcs=1,
                 in_channels=256,
+                conv_out_channels=256,
                 fc_out_channels=1024,
                 roi_feat_size=7,
                 num_classes=num_classes,
                 bbox_coder=dict(
                     type='DeltaXYWHBBoxCoder',
-                    target_means=[0.0, 0.0, 0.0, 0.0],
+                    target_means=[0., 0., 0., 0.],
                     target_stds=[0.1, 0.1, 0.2, 0.2]),
-                reg_class_agnostic=True,
+                reg_class_agnostic=False,
+                reg_decoded_bbox=True,
+                norm_cfg=dict(type='SyncBN', requires_grad=True),
                 loss_cls=dict(
-                    type='CrossEntropyLoss',
-                    use_sigmoid=False,
-                    loss_weight=1.0),
-                loss_bbox=dict(type='SmoothL1Loss', beta=1.0,
-                               loss_weight=1.0)),
+                    type='CrossEntropyLoss', use_sigmoid=False, loss_weight=1.0),
+                loss_bbox=dict(type='GIoULoss', loss_weight=10.0)),
             dict(
-                type='Shared2FCBBoxHead',
+                type='ConvFCBBoxHead',
+                num_shared_convs=4,
+                num_shared_fcs=1,
                 in_channels=256,
+                conv_out_channels=256,
                 fc_out_channels=1024,
                 roi_feat_size=7,
                 num_classes=num_classes,
                 bbox_coder=dict(
                     type='DeltaXYWHBBoxCoder',
-                    target_means=[0.0, 0.0, 0.0, 0.0],
+                    target_means=[0., 0., 0., 0.],
                     target_stds=[0.05, 0.05, 0.1, 0.1]),
-                reg_class_agnostic=True,
+                reg_class_agnostic=False,
+                reg_decoded_bbox=True,
+                norm_cfg=dict(type='SyncBN', requires_grad=True),
                 loss_cls=dict(
-                    type='CrossEntropyLoss',
-                    use_sigmoid=False,
-                    loss_weight=1.0),
-                loss_bbox=dict(type='SmoothL1Loss', beta=1.0,
-                               loss_weight=1.0)),
+                    type='CrossEntropyLoss', use_sigmoid=False, loss_weight=1.0),
+                loss_bbox=dict(type='GIoULoss', loss_weight=10.0)),
             dict(
-                type='Shared2FCBBoxHead',
+                type='ConvFCBBoxHead',
+                num_shared_convs=4,
+                num_shared_fcs=1,
                 in_channels=256,
+                conv_out_channels=256,
                 fc_out_channels=1024,
                 roi_feat_size=7,
                 num_classes=num_classes,
                 bbox_coder=dict(
                     type='DeltaXYWHBBoxCoder',
-                    target_means=[0.0, 0.0, 0.0, 0.0],
+                    target_means=[0., 0., 0., 0.],
                     target_stds=[0.033, 0.033, 0.067, 0.067]),
-                reg_class_agnostic=True,
+                reg_class_agnostic=False,
+                reg_decoded_bbox=True,
+                norm_cfg=dict(type='SyncBN', requires_grad=True),
                 loss_cls=dict(
-                    type='CrossEntropyLoss',
-                    use_sigmoid=False,
-                    loss_weight=1.0),
-                loss_bbox=dict(type='SmoothL1Loss', beta=1.0,
-                               loss_weight=1.0))
+                    type='CrossEntropyLoss', use_sigmoid=False, loss_weight=1.0),
+                loss_bbox=dict(type='GIoULoss', loss_weight=10.0))
         ]),
+    # model training and testing settings
     train_cfg = dict(
         rpn=dict(
             assigner=dict(
@@ -138,7 +129,9 @@ model = dict(
             pos_weight=-1,
             debug=False),
         rpn_proposal=dict(
+            nms_across_levels=False,
             nms_pre=2000,
+            nms_post=2000,
             max_per_img=2000,
             nms=dict(type='nms', iou_threshold=0.7),
             min_bbox_size=0),
@@ -194,7 +187,9 @@ model = dict(
         ]),
     test_cfg = dict(
         rpn=dict(
+            nms_across_levels=False,
             nms_pre=1000,
+            nms_post=1000,
             max_per_img=1000,
             nms=dict(type='nms', iou_threshold=0.7),
             min_bbox_size=0),
@@ -202,27 +197,14 @@ model = dict(
             score_thr=0.0001,
             nms=dict(type='soft_nms', iou_threshold=0.5, min_score=0.0001),
             max_per_img=100)))
+
 dataset_type = 'CocoDataset'
-data_root = 'data/rich/'
-classes = ["phone", "pad", "laptop", "wallet", "packsack"]
-# classes = ["knife",
-#     "scissors",
-#     "sharpTools",
-#     "expandableBaton",
-#     "smallGlassBottle",
-#     "electricBaton",
-#     "plasticBeverageBottle",
-#     "plasticBottleWithaNozzle",
-#     "electronicEquipment",
-#     "battery",
-#     "seal",
-#     "umbrella"]
-# classes = ["pig"]
+data_root = 'data/reef/'
+classes = ["starfish"]
+
 albu_train_transforms = [
-    dict(type='RandomRotate90', p=0.5),
-    # dict(type='VerticalFlip', p=0.5),
-    # dict(type='ShiftScaleRotate', shift_limit=0.0625, scale_limit=0.5, rotate_limit=30, interpolation=1, p=0.5),
-    # dict(type='Cutout', p=0.5)
+    # dict(type='RandomRotate90', p=0.5),
+    # dict(type='Co', p=0.5)
 ]
 
 img_norm_cfg = dict(
@@ -230,24 +212,22 @@ img_norm_cfg = dict(
 train_pipeline = [
     dict(type='LoadImageFromFile'),
     dict(type='LoadAnnotations', with_bbox=True),
-    dict(type='Resize', img_scale=[(4000, 720), (4000, 1200)], keep_ratio=True),
+    dict(type='Resize', img_scale=[(4000, 1000), (4000, 1400)], keep_ratio=True),
     dict(type='RandomFlip', flip_ratio=0.5),
-    # dict(type='AutoAugmentPolicy', autoaug_type="v1"),
-    # dict(type='MixUp'),
-    # dict(type='BoxPaste', objects_from="./data/rich/cuts", sample_thr=0.15, sample_n=2, p=0.8),
+    dict(type='AutoAugmentPolicy', autoaug_type="v1"),
     # dict(type='BBoxJitter', min=0.95, max=1.05),
     dict(type='Normalize', **img_norm_cfg),
     dict(type='Pad', size_divisor=32),
-    dict(type='Albu',
-         transforms=albu_train_transforms,
-         bbox_params=dict(type='BboxParams',
-                          format='pascal_voc',
-                          label_fields=['gt_labels'],
-                          min_visibility=0.0,
-                          filter_lost_elements=True),
-         keymap={'img': 'image', 'gt_bboxes': 'bboxes'},
-         update_pad_shape=False,
-         skip_img_without_anno=True),
+    # dict(type='Albu',
+    #      transforms=albu_train_transforms,
+    #      bbox_params=dict(type='BboxParams',
+    #                       format='pascal_voc',
+    #                       label_fields=['gt_labels'],
+    #                       min_visibility=0.0,
+    #                       filter_lost_elements=True),
+    #      keymap={'img': 'image', 'gt_bboxes': 'bboxes'},
+    #      update_pad_shape=False,
+    #      skip_img_without_anno=True),
     dict(type='DefaultFormatBundle'),
     dict(type='Collect', keys=['img', 'gt_bboxes', 'gt_labels']),
 ]
@@ -255,7 +235,7 @@ test_pipeline = [
     dict(type='LoadImageFromFile'),
     dict(
         type='MultiScaleFlipAug',
-        img_scale=[(4000, 720), (4000, 1200)],
+        img_scale=[(4000, 1000), (4000, 1400)],
         flip=True,
         transforms=[
             dict(type='Resize', keep_ratio=True),
@@ -267,7 +247,7 @@ test_pipeline = [
         ])
 ]
 data = dict(
-    samples_per_gpu=2,
+    samples_per_gpu=1,
     workers_per_gpu=2,
     # train=dict(
     #         classes=classes,
@@ -276,19 +256,31 @@ data = dict(
     #         img_prefix=data_root + 'train/images/',
     #         pipeline=train_pipeline),
     train=dict(
-            type='RepeatDataset',
-            times=1,
-            dataset=dict(
+        type='ConcatDataset',
+        datasets=[
+            dict(
+                filter_empty_gt=True,
+                downsample=5,
                 classes=classes,
-                type=dataset_type,
-                ann_file=data_root + 'train_C/annotations/train.json',
-                img_prefix=data_root + 'train_C/images/',
-                pipeline=train_pipeline)),
+                type="DownSampleCocoDataset",
+                ann_file=data_root + 'train/annotations/video_1.json',
+                img_prefix=data_root + 'train/images/',
+                pipeline=train_pipeline),
+            dict(
+                filter_empty_gt=True,
+                downsample=5,
+                classes=classes,
+                type="DownSampleCocoDataset",
+                ann_file=data_root + 'train/annotations/video_2.json',
+                img_prefix=data_root + 'train/images/',
+                pipeline=train_pipeline),
+            ]),
     val=dict(
+            filter_empty_gt=False,
             classes=classes,
             type=dataset_type,
-            ann_file=data_root + 'train_B/annotations/train.json',
-            img_prefix=data_root + 'train_B/images/',
+            ann_file=data_root + 'train/annotations/video_0.json',
+            img_prefix=data_root + 'train/images/',
             pipeline=test_pipeline),
     # test=dict(
     #         classes=classes,
@@ -297,67 +289,38 @@ data = dict(
     #         img_prefix=data_root + 'train/images/',
     #         pipeline=test_pipeline),
     test=dict(
+            filter_empty_gt=True,
             classes=classes,
             type=dataset_type,
-            ann_file=data_root + 'test_C/annotations/test.json',
-            img_prefix=data_root + 'test_C/images/',
+            ann_file=data_root + 'test/annotations/test.json',
+            img_prefix=data_root + 'test/images/',
             pipeline=test_pipeline)
 )
 
-work_dir = './work_dirs/rich/drs_1x_6bs_nogc_aav1_rot_co_bj_720_1200'
+nx = 1
+work_dir = f'./work_dirs/reef/sws_{nx}x_5d_aav1'
 evaluation = dict(
     classwise=True, 
     interval=12, 
     metric='bbox',
     jsonfile_prefix=f"{work_dir}/valid")
-# optimizer = dict(
-#     type='SGD_GC',
-#     lr=0.0025 * 6,
-#     momentum=0.9,
-#     weight_decay=0.0001,
-#     paramwise_cfg=dict(bias_lr_mult=2.0, bias_decay_mult=0.0))
-
-optimizer = dict(type='SGD', lr=0.01, momentum=0.9, weight_decay=0.0001)
-optimizer_config = dict(grad_clip=None)
+optimizer = dict(type='AdamW', lr=0.0001, betas=(0.9, 0.999), weight_decay=0.05,
+                 paramwise_cfg=dict(custom_keys={'absolute_pos_embed': dict(decay_mult=0.),
+                                                 'relative_position_bias_table': dict(decay_mult=0.),
+                                                 'norm': dict(decay_mult=0.)}))
+optimizer_config = dict(grad_clip=None, cumulative_iters=1)
 lr_config = dict(
     policy='step',
     warmup='linear',
-    warmup_iters=500,
-    warmup_ratio=1/3,
-    step=[8, 11])
-custom_hooks = [dict(type='NumClassCheckHook')]
-total_epochs = 12
-runner = dict(type='EpochBasedRunner', max_epochs=total_epochs)
-checkpoint_config = dict(interval=total_epochs)
+    warmup_iters=50,
+    warmup_ratio=0.001,
+    step=[8 * nx, 11 * nx])
+total_epochs = 12 * nx
+checkpoint_config = dict(interval=total_epochs, save_optimizer=False)
 log_config = dict(interval=50, hooks=[dict(type='TextLoggerHook')])
 dist_params = dict(backend='nccl')
 log_level = 'INFO'
-load_from = './weights/detectors_htc_r50_1x_coco-329b1453.pth'
+load_from = './weights/cascade_mask_rcnn_swin_small_patch4_window7.pth'
 resume_from = None
 workflow = [('train', 1)]
 fp16 = dict(loss_scale=512.0)
-
-
-# only_swa_training = False
-# # whether to perform swa training
-# swa_training = True
-# # load the best pre_trained model as the starting model for swa training
-# swa_load_from = work_dir + '/epoch_12.pth'
-# swa_resume_from = None
-
-# # swa optimizer
-# swa_optimizer = dict(type='SGD', lr=0.01, momentum=0.9, weight_decay=0.0001)
-# swa_optimizer_config = dict(grad_clip=None)
-
-# # swa learning policy
-# swa_lr_config = dict(
-#     policy='cyclic',
-#     target_ratio=(1, 0.01),
-#     cyclic_times=12,
-#     step_ratio_up=0.0)
-# swa_runner = dict(type='EpochBasedRunner', max_epochs=12)
-# # the epoch interval to perform swa
-# swa_interval = 1
-
-# # swa checkpoint setting
-# swa_checkpoint_config = dict(interval=1, filename_tmpl='swa_epoch_{}.pth')

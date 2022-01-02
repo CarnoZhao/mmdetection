@@ -1,4 +1,4 @@
-num_classes = 12
+num_classes = 1
 
 model = dict(
     type='CascadeRCNN',
@@ -6,7 +6,7 @@ model = dict(
     backbone=dict(
         type='SwinTransformer',
         embed_dim=96,
-        depths=[2, 2, 18, 2],
+        depths=[2, 2, 6, 2],
         num_heads=[3, 6, 12, 24],
         window_size=7,
         mlp_ratio=4.,
@@ -49,7 +49,7 @@ model = dict(
             roi_layer=dict(type='RoIAlign', output_size=7, sampling_ratio=0),
             out_channels=256,
             featmap_strides=[4, 8, 16, 32],
-            add_context=True),
+            add_context=False),
         bbox_head=[
             dict(
                 type='ConvFCBBoxHead',
@@ -59,7 +59,7 @@ model = dict(
                 conv_out_channels=256,
                 fc_out_channels=1024,
                 roi_feat_size=7,
-                num_classes=80,
+                num_classes=num_classes,
                 bbox_coder=dict(
                     type='DeltaXYWHBBoxCoder',
                     target_means=[0., 0., 0., 0.],
@@ -78,7 +78,7 @@ model = dict(
                 conv_out_channels=256,
                 fc_out_channels=1024,
                 roi_feat_size=7,
-                num_classes=80,
+                num_classes=num_classes,
                 bbox_coder=dict(
                     type='DeltaXYWHBBoxCoder',
                     target_means=[0., 0., 0., 0.],
@@ -97,7 +97,7 @@ model = dict(
                 conv_out_channels=256,
                 fc_out_channels=1024,
                 roi_feat_size=7,
-                num_classes=80,
+                num_classes=num_classes,
                 bbox_coder=dict(
                     type='DeltaXYWHBBoxCoder',
                     target_means=[0., 0., 0., 0.],
@@ -195,29 +195,16 @@ model = dict(
             min_bbox_size=0),
         rcnn=dict(
             score_thr=0.0001,
-            nms=dict(type='nms', iou_threshold=0.5),
+            nms=dict(type='soft_nms', iou_threshold=0.5, min_score=0.0001),
             max_per_img=100)))
 
 dataset_type = 'CocoDataset'
-data_root = 'data/check/'
-# classes = ["phone", "pad", "laptop", "wallet", "packsack"]
-classes = ["knife",
-    "scissors",
-    "sharpTools",
-    "expandableBaton",
-    "smallGlassBottle",
-    "electricBaton",
-    "plasticBeverageBottle",
-    "plasticBottleWithaNozzle",
-    "electronicEquipment",
-    "battery",
-    "seal",
-    "umbrella"]
-# classes = ["pig"]
+data_root = 'data/reef/'
+classes = ["starfish"]
 
 albu_train_transforms = [
-    dict(type='RandomRotate90', p=0.5),
-    dict(type='ShiftScaleRotate', shift_limit=0.0625, scale_limit=0.5, rotate_limit=30, interpolation=1, p=0.5)
+    dict(type='ColorJitter', p=0.5),
+    # dict(type='Co', p=0.5)
 ]
 
 img_norm_cfg = dict(
@@ -225,13 +212,9 @@ img_norm_cfg = dict(
 train_pipeline = [
     dict(type='LoadImageFromFile'),
     dict(type='LoadAnnotations', with_bbox=True),
-    dict(
-        type='Resize',
-        img_scale=[(1400, 600), (1400, 1000)],
-        multiscale_mode='range',
-        keep_ratio=True),
+    dict(type='Resize', img_scale=[(4000, 1000), (4000, 1400)], keep_ratio=True),
     dict(type='RandomFlip', flip_ratio=0.5),
-    # dict(type='AutoAugmentPolicy', autoaug_type="v1"),
+    dict(type='AutoAugmentPolicy', autoaug_type="v1"),
     # dict(type='BBoxJitter', min=0.95, max=1.05),
     dict(type='Normalize', **img_norm_cfg),
     dict(type='Pad', size_divisor=32),
@@ -252,7 +235,7 @@ test_pipeline = [
     dict(type='LoadImageFromFile'),
     dict(
         type='MultiScaleFlipAug',
-        img_scale=[(1600, 600), (1600, 800), (1600, 1000)],
+        img_scale=[(4000, 1000), (4000, 1400)],
         flip=True,
         transforms=[
             dict(type='Resize', keep_ratio=True),
@@ -273,18 +256,30 @@ data = dict(
     #         img_prefix=data_root + 'train/images/',
     #         pipeline=train_pipeline),
     train=dict(
-        type='RepeatDataset',
-        times=2,
-        dataset=dict(
-            classes=classes,
-            type=dataset_type,
-            ann_file=data_root + 'train/annotations/train.json',
-            img_prefix=data_root + 'train/images/',
-            pipeline=train_pipeline)),
+        type='ConcatDataset',
+        datasets=[
+            dict(
+                filter_empty_gt=True,
+                downsample=5,
+                classes=classes,
+                type="DownSampleCocoDataset",
+                ann_file=data_root + 'train/annotations/video_1.json',
+                img_prefix=data_root + 'train/images/',
+                pipeline=train_pipeline),
+            dict(
+                filter_empty_gt=True,
+                downsample=5,
+                classes=classes,
+                type="DownSampleCocoDataset",
+                ann_file=data_root + 'train/annotations/video_2.json',
+                img_prefix=data_root + 'train/images/',
+                pipeline=train_pipeline),
+            ]),
     val=dict(
+            filter_empty_gt=False,
             classes=classes,
             type=dataset_type,
-            ann_file=data_root + 'train/jsons/valid_fold_0.json',
+            ann_file=data_root + 'train/annotations/video_0.json',
             img_prefix=data_root + 'train/images/',
             pipeline=test_pipeline),
     # test=dict(
@@ -294,14 +289,16 @@ data = dict(
     #         img_prefix=data_root + 'train/images/',
     #         pipeline=test_pipeline),
     test=dict(
+            filter_empty_gt=True,
             classes=classes,
             type=dataset_type,
-            ann_file=data_root + 'test_A/annotations/test.json',
-            img_prefix=data_root + 'test_A/images/',
+            ann_file=data_root + 'test/annotations/test.json',
+            img_prefix=data_root + 'test/images/',
             pipeline=test_pipeline)
 )
 
-work_dir = './work_dirs/check/sws_2x_6bs_600_1000_rot'
+nx = 2
+work_dir = f'./work_dirs/reef/swt_{nx}x_5d_aav1_cj_f0'
 evaluation = dict(
     classwise=True, 
     interval=12, 
@@ -311,19 +308,19 @@ optimizer = dict(type='AdamW', lr=0.0001, betas=(0.9, 0.999), weight_decay=0.05,
                  paramwise_cfg=dict(custom_keys={'absolute_pos_embed': dict(decay_mult=0.),
                                                  'relative_position_bias_table': dict(decay_mult=0.),
                                                  'norm': dict(decay_mult=0.)}))
-optimizer_config = dict(grad_clip=None)
+optimizer_config = dict(grad_clip=None, cumulative_iters=1)
 lr_config = dict(
     policy='step',
     warmup='linear',
-    warmup_iters=500,
+    warmup_iters=50,
     warmup_ratio=0.001,
-    step=[8, 11])
-total_epochs = 12
-checkpoint_config = dict(interval=total_epochs)
+    step=[8 * nx, 11 * nx])
+total_epochs = 12 * nx
+checkpoint_config = dict(interval=total_epochs, save_optimizer=False)
 log_config = dict(interval=50, hooks=[dict(type='TextLoggerHook')])
 dist_params = dict(backend='nccl')
 log_level = 'INFO'
-load_from = './weights/cascade_mask_rcnn_swin_small_patch4_window7.pth'
+load_from = './weights/cascade_mask_rcnn_swin_tiny_patch4_window7.pth'
 resume_from = None
 workflow = [('train', 1)]
 fp16 = dict(loss_scale=512.0)

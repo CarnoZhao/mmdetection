@@ -1,10 +1,11 @@
 num_classes = 3
+
 # model settings
 model = dict(
     type='HybridTaskCascade',
     backbone=dict(
-        type='DetectoRS_ResNeXt',
-        depth=50,
+        type='ResNeXt',
+        depth=101,
         groups=32,
         base_width=4,
         num_stages=4,
@@ -13,35 +14,12 @@ model = dict(
         norm_cfg=dict(type='BN', requires_grad=True),
         norm_eval=True,
         style='pytorch',
-        conv_cfg=dict(type='ConvAWS'),
-        sac=dict(type='SAC', use_deform=True),
-        stage_with_sac=(False, True, True, True),
-        output_img=True,
-        pretrained='open-mmlab://resnext50_32x4d'),
+        init_cfg=dict()),
     neck=dict(
-        type='RFP',
+        type='FPN',
         in_channels=[256, 512, 1024, 2048],
         out_channels=256,
-        num_outs=5,
-        rfp_steps=2,
-        aspp_out_channels=64,
-        aspp_dilations=(1, 3, 6, 1),
-        rfp_backbone=dict(
-            rfp_inplanes=256,
-            type='DetectoRS_ResNeXt',
-            depth=50,
-            groups=32,
-            base_width=4,
-            num_stages=4,
-            out_indices=(0, 1, 2, 3),
-            frozen_stages=1,
-            norm_cfg=dict(type='BN', requires_grad=True),
-            norm_eval=True,
-            conv_cfg=dict(type='ConvAWS'),
-            sac=dict(type='SAC', use_deform=True),
-            stage_with_sac=(False, True, True, True),
-            pretrained='open-mmlab://resnext50_32x4d',
-            style='pytorch')),
+        num_outs=5),
     rpn_head=dict(
         type='RPNHead',
         in_channels=256,
@@ -79,7 +57,7 @@ model = dict(
                 bbox_coder=dict(
                     type='DeltaXYWHBBoxCoder',
                     target_means=[0., 0., 0., 0.],
-                     target_stds=[0.1, 0.1, 0.2, 0.2]),
+                    target_stds=[0.1, 0.1, 0.2, 0.2]),
                 reg_class_agnostic=True,
                 loss_cls=dict(
                     type='CrossEntropyLoss',
@@ -161,7 +139,6 @@ model = dict(
                 pos_iou_thr=0.7,
                 neg_iou_thr=0.3,
                 min_pos_iou=0.3,
-                match_low_quality=True,
                 ignore_iof_thr=-1),
             sampler=dict(
                 type='RandomSampler',
@@ -184,7 +161,6 @@ model = dict(
                     pos_iou_thr=0.5,
                     neg_iou_thr=0.5,
                     min_pos_iou=0.5,
-                    match_low_quality=False,
                     ignore_iof_thr=-1),
                 sampler=dict(
                     type='RandomSampler',
@@ -201,7 +177,6 @@ model = dict(
                     pos_iou_thr=0.6,
                     neg_iou_thr=0.6,
                     min_pos_iou=0.6,
-                    match_low_quality=False,
                     ignore_iof_thr=-1),
                 sampler=dict(
                     type='RandomSampler',
@@ -218,7 +193,6 @@ model = dict(
                     pos_iou_thr=0.7,
                     neg_iou_thr=0.7,
                     min_pos_iou=0.7,
-                    match_low_quality=False,
                     ignore_iof_thr=-1),
                 sampler=dict(
                     type='RandomSampler',
@@ -239,9 +213,8 @@ model = dict(
         rcnn=dict(
             score_thr=0.001,
             nms=dict(type='nms', iou_threshold=0.5),
-            max_per_img=1000,
+            max_per_img=100,
             mask_thr_binary=0.5)))
-
 dataset_type = 'CocoDataset'
 data_root = 'data/cell/'
 classes = ['shsy5y', 'astro', 'cort']
@@ -258,7 +231,7 @@ img_norm_cfg = dict(
 train_pipeline = [
     dict(type='LoadImageFromFile'),
     dict(type='LoadAnnotations', with_bbox=True, with_mask=True),
-    dict(type='Resize', img_scale=[(1333, 1333), (1024, 1024)], keep_ratio=True),
+    dict(type='Resize', img_scale=[(1333, 1333), (800, 800)], keep_ratio=True),
     dict(type='RandomFlip', flip_ratio=0.5),
     # dict(type='AutoAugmentPolicy', autoaug_type="v2"),
     # dict(type='MixUp'),
@@ -283,7 +256,7 @@ test_pipeline = [
     dict(type='LoadImageFromFile'),
     dict(
         type='MultiScaleFlipAug',
-        img_scale=[(1333, 1333), (1180, 1180), (1024, 1024)],
+        img_scale=[(1333, 1333), (1024, 1024), (800, 800)],
         flip=True,
         flip_direction=["horizontal","vertical"],
         transforms=[
@@ -297,7 +270,7 @@ test_pipeline = [
 ]
 holdout = 0
 data = dict(
-    samples_per_gpu=3,
+    samples_per_gpu=4,
     workers_per_gpu=2,
     train=[dict(
             classes=classes,
@@ -305,7 +278,7 @@ data = dict(
             downsample=2,
             ann_file=data_root + f'train_tiny/annotations/fold_{fold}.json',
             img_prefix=data_root + 'train_tiny/images/',
-            pipeline=train_pipeline) for fold in range(5)], # if fold != holdout],
+            pipeline=train_pipeline) for fold in range(5) if fold != holdout],
     val=dict(
             classes=classes,
             type=dataset_type,
@@ -315,16 +288,16 @@ data = dict(
     test=dict(
             classes=classes,
             type=dataset_type,
-            ann_file=data_root + 'train_tiny/annotations/fold_0.json',
+            ann_file=data_root + f'train_tiny/annotations/fold_{holdout}.json',
             img_prefix=data_root + 'train_tiny/images/',
             pipeline=test_pipeline)
 )
 
 nx = 1
-work_dir = f'./work_dirs/cell/drsx50_{nx}x_hvflip_rot90_tiny_d2_all'
+work_dir = f'./work_dirs/cell/htcx101_{nx}x_d2_800_f0'
 evaluation = dict(
-    classwise=True,
-    interval=12,
+    classwise=True, 
+    interval=12, 
     metric=['bbox', 'segm'],
     jsonfile_prefix=f"{work_dir}/valid")
 optimizer = dict(type='SGD', lr=0.01, momentum=0.9, weight_decay=0.0001)
@@ -342,10 +315,11 @@ checkpoint_config = dict(interval=total_epochs, save_optimizer=False)
 log_config = dict(interval=50, hooks=[dict(type='TextLoggerHook')])
 dist_params = dict(backend='nccl')
 log_level = 'INFO'
-load_from = None # './weights/detectors_htc_r50_1x_coco-329b1453.pth'
+load_from = './weights/htc_x101_32x4d_fpn_16x1_20e_coco_20200318-de97ae01.pth'
 resume_from = None
 workflow = [('train', 1)]
 fp16 = dict(loss_scale=512.0)
+gpu_ids=(2,3)
 
 
 only_swa_training = False
