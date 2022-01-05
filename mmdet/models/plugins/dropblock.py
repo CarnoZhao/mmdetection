@@ -1,3 +1,4 @@
+# Copyright (c) OpenMMLab. All rights reserved.
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
@@ -78,3 +79,7 @@ class DropBlock(nn.Module):
         factor = (1.0 if self.iter_cnt > self.warmup_iters else self.iter_cnt /
                   self.warmup_iters)
         return gamma * factor
+
+    def extra_repr(self):
+        return (f'drop_prob={self.drop_prob}, block_size={self.block_size}, '
+                f'warmup_iters={self.warmup_iters}')

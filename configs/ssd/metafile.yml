@@ -8,8 +8,13 @@ Collections:
       Training Resources: 8x V100 GPUs
       Architecture:
         - VGG
-    Paper: https://arxiv.org/abs/1512.02325
+    Paper:
+      URL: https://arxiv.org/abs/1512.02325
+      Title: 'SSD: Single Shot MultiBox Detector'
     README: configs/ssd/README.md
+    Code:
+      URL: https://github.com/open-mmlab/mmdetection/blob/v2.14.0/mmdet/models/dense_heads/ssd_head.py#L16
+      Version: v2.14.0
 
 Models:
   - Name: ssd300_coco
@@ -29,8 +34,8 @@ Models:
       - Task: Object Detection
         Dataset: COCO
         Metrics:
-          box AP: 25.9
-    Weights: https://download.openmmlab.com/mmdetection/v2.0/ssd/ssd300_coco/ssd300_coco_20210604_193052-b61137df.pth
+          box AP: 25.5
+    Weights: https://download.openmmlab.com/mmdetection/v2.0/ssd/ssd300_coco/ssd300_coco_20210803_015428-d231a06e.pth
 
   - Name: ssd512_coco
     In Collection: SSD
@@ -49,8 +54,8 @@ Models:
       - Task: Object Detection
         Dataset: COCO
         Metrics:
-          box AP: 29.8
-    Weights: https://download.openmmlab.com/mmdetection/v2.0/ssd/ssd512_coco/ssd512_coco_20210604_111835-d3eba047.pth
+          box AP: 29.5
+    Weights: https://download.openmmlab.com/mmdetection/v2.0/ssd/ssd512_coco/ssd512_coco_20210803_022849-0a47a1ca.pth
 
   - Name: ssdlite_mobilenetv2_scratch_600e_coco
     In Collection: SSD

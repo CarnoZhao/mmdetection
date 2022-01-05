@@ -1,6 +1,8 @@
 #!/usr/bin/env python
+# Copyright (c) OpenMMLab. All rights reserved.
 import os
 import os.path as osp
+import platform
 import shutil
 import sys
 import warnings
@@ -129,7 +131,7 @@ def parse_requirements(fname='requirements.txt', with_version=True):
     return packages
 
 
-def add_mim_extention():
+def add_mim_extension():
     """Add extra files that are required to support MIM into the package.
 
     These files will be added by creating a symlink to the originals if the
@@ -140,7 +142,11 @@ def add_mim_extention():
     # parse installment mode
     if 'develop' in sys.argv:
         # installed by `pip install -e .`
-        mode = 'symlink'
+        if platform.system() == 'Windows':
+            # set `copy` mode here since symlink fails on Windows.
+            mode = 'copy'
+        else:
+            mode = 'symlink'
     elif 'sdist' in sys.argv or 'bdist_wheel' in sys.argv:
         # installed by `pip install .`
         # or create source distribution by `python setup.py sdist`
@@ -178,14 +184,14 @@ def add_mim_extention():
 
 
 if __name__ == '__main__':
-    add_mim_extention()
+    add_mim_extension()
     setup(
         name='mmdet',
         version=get_version(),
         description='OpenMMLab Detection Toolbox and Benchmark',
         long_description=readme(),
         long_description_content_type='text/markdown',
-        author='OpenMMLab',
+        author='MMDetection Contributors',
         author_email='openmmlab@gmail.com',
         keywords='computer vision, object detection',
         url='https://github.com/open-mmlab/mmdetection',
@@ -199,6 +205,7 @@ if __name__ == '__main__':
             'Programming Language :: Python :: 3.6',
             'Programming Language :: Python :: 3.7',
             'Programming Language :: Python :: 3.8',
+            'Programming Language :: Python :: 3.9',
         ],
         license='Apache License 2.0',
         setup_requires=parse_requirements('requirements/build.txt'),

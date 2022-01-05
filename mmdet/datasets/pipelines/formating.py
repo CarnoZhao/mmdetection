@@ -1,3 +1,4 @@
+# Copyright (c) OpenMMLab. All rights reserved.
 from collections.abc import Sequence
 
 import mmcv
@@ -92,7 +93,7 @@ class ImageToTensor:
             img = results[key]
             if len(img.shape) < 3:
                 img = np.expand_dims(img, -1)
-            results[key] = to_tensor(img.transpose(2, 0, 1))
+            results[key] = (to_tensor(img.transpose(2, 0, 1))).contiguous()
         return results
 
     def __repr__(self):
@@ -128,7 +129,7 @@ class Transpose:
 
     def __repr__(self):
         return self.__class__.__name__ + \
-            f'(keys={self.keys}, order={self.order})'
+               f'(keys={self.keys}, order={self.order})'
 
 
 @PIPELINES.register_module()
@@ -186,7 +187,21 @@ class DefaultFormatBundle:
     - gt_masks: (1)to tensor, (2)to DataContainer (cpu_only=True)
     - gt_semantic_seg: (1)unsqueeze dim-0 (2)to tensor, \
                        (3)to DataContainer (stack=True)
+
+    Args:
+        img_to_float (bool): Whether to force the image to be converted to
+            float type. Default: True.
+        pad_val (dict): A dict for padding value in batch collating,
+            the default value is `dict(img=0, masks=0, seg=255)`.
+            Without this argument, the padding value of "gt_semantic_seg"
+            will be set to 0 by default, which should be 255.
     """
+
+    def __init__(self,
+                 img_to_float=True,
+                 pad_val=dict(img=0, masks=0, seg=255)):
+        self.img_to_float = img_to_float
+        self.pad_val = pad_val
 
     def __call__(self, results):
         """Call function to transform and format common fields in results.
@@ -201,21 +216,33 @@ class DefaultFormatBundle:
 
         if 'img' in results:
             img = results['img']
+            if self.img_to_float is True and img.dtype == np.uint8:
+                # Normally, image is of uint8 type without normalization.
+                # At this time, it needs to be forced to be converted to
+                # flot32, otherwise the model training and inference
+                # will be wrong. Only used for YOLOX currently .
+                img = img.astype(np.float32)
             # add default meta keys
             results = self._add_default_meta_keys(results)
             if len(img.shape) < 3:
                 img = np.expand_dims(img, -1)
             img = np.ascontiguousarray(img.transpose(2, 0, 1))
-            results['img'] = DC(to_tensor(img), stack=True)
+            results['img'] = DC(
+                to_tensor(img), padding_value=self.pad_val['img'], stack=True)
         for key in ['proposals', 'gt_bboxes', 'gt_bboxes_ignore', 'gt_labels']:
             if key not in results:
                 continue
             results[key] = DC(to_tensor(results[key]))
         if 'gt_masks' in results:
-            results['gt_masks'] = DC(results['gt_masks'], cpu_only=True)
+            results['gt_masks'] = DC(
+                results['gt_masks'],
+                padding_value=self.pad_val['masks'],
+                cpu_only=True)
         if 'gt_semantic_seg' in results:
             results['gt_semantic_seg'] = DC(
-                to_tensor(results['gt_semantic_seg'][None, ...]), stack=True)
+                to_tensor(results['gt_semantic_seg'][None, ...]),
+                padding_value=self.pad_val['seg'],
+                stack=True)
         return results
 
     def _add_default_meta_keys(self, results):
@@ -244,7 +271,8 @@ class DefaultFormatBundle:
         return results
 
     def __repr__(self):
-        return self.__class__.__name__
+        return self.__class__.__name__ + \
+               f'(img_to_float={self.img_to_float})'
 
 
 @PIPELINES.register_module()
@@ -320,7 +348,7 @@ class Collect:
 
     def __repr__(self):
         return self.__class__.__name__ + \
-            f'(keys={self.keys}, meta_keys={self.meta_keys})'
+               f'(keys={self.keys}, meta_keys={self.meta_keys})'
 
 
 @PIPELINES.register_module()
