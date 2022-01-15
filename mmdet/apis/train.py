@@ -183,7 +183,8 @@ def train_detector(model,
         # register hooks
         runner.register_training_hooks(cfg.lr_config, optimizer_config,
                                        cfg.checkpoint_config, cfg.log_config,
-                                       cfg.get('momentum_config', None))
+                                       cfg.get('momentum_config', None),
+                                       custom_hooks_config=cfg.get('custom_hooks', None))
         if distributed:
             if isinstance(runner, EpochBasedRunner):
                 runner.register_hook(DistSamplerSeedHook())
@@ -210,18 +211,18 @@ def train_detector(model,
                 eval_hook(val_dataloader, save_best='bbox_mAP', **eval_cfg))
 
         # user-defined hooks
-        if cfg.get('custom_hooks', None):
-            custom_hooks = cfg.custom_hooks
-            assert isinstance(custom_hooks, list), \
-                f'custom_hooks expect list type, but got {type(custom_hooks)}'
-            for hook_cfg in cfg.custom_hooks:
-                assert isinstance(hook_cfg, dict), \
-                    'Each item in custom_hooks expects dict type, but got ' \
-                    f'{type(hook_cfg)}'
-                hook_cfg = hook_cfg.copy()
-                priority = hook_cfg.pop('priority', 'NORMAL')
-                hook = build_from_cfg(hook_cfg, HOOKS)
-                runner.register_hook(hook, priority=priority)
+        # if cfg.get('custom_hooks', None):
+        #     custom_hooks = cfg.custom_hooks
+        #     assert isinstance(custom_hooks, list), \
+        #         f'custom_hooks expect list type, but got {type(custom_hooks)}'
+        #     for hook_cfg in cfg.custom_hooks:
+        #         assert isinstance(hook_cfg, dict), \
+        #             'Each item in custom_hooks expects dict type, but got ' \
+        #             f'{type(hook_cfg)}'
+        #         hook_cfg = hook_cfg.copy()
+        #         priority = hook_cfg.pop('priority', 'NORMAL')
+        #         hook = build_from_cfg(hook_cfg, HOOKS)
+        #         runner.register_hook(hook, priority=priority)
 
         if cfg.resume_from:
             runner.resume(cfg.resume_from)
@@ -265,7 +266,8 @@ def train_detector(model,
     swa_runner.register_training_hooks(cfg.swa_lr_config, swa_optimizer_config,
                                        cfg.swa_checkpoint_config,
                                        cfg.log_config,
-                                       cfg.get('momentum_config', None))
+                                       cfg.get('momentum_config', None),
+                                       custom_hooks_config=cfg.get('custom_hooks', None))
     if distributed:
         if isinstance(swa_runner, EpochBasedRunner):
             swa_runner.register_hook(DistSamplerSeedHook())
@@ -304,18 +306,18 @@ def train_detector(model,
     swa_runner.register_hook(swa_hook, priority='LOW')
 
     # register user-defined hooks
-    if cfg.get('custom_hooks', None):
-        custom_hooks = cfg.custom_hooks
-        assert isinstance(custom_hooks, list), \
-            f'custom_hooks expect list type, but got {type(custom_hooks)}'
-        for hook_cfg in cfg.custom_hooks:
-            assert isinstance(hook_cfg, dict), \
-                'Each item in custom_hooks expects dict type, but got ' \
-                f'{type(hook_cfg)}'
-            hook_cfg = hook_cfg.copy()
-            priority = hook_cfg.pop('priority', 'NORMAL')
-            hook = build_from_cfg(hook_cfg, HOOKS)
-            swa_runner.register_hook(hook, priority=priority)
+    # if cfg.get('custom_hooks', None):
+    #     custom_hooks = cfg.custom_hooks
+    #     assert isinstance(custom_hooks, list), \
+    #         f'custom_hooks expect list type, but got {type(custom_hooks)}'
+    #     for hook_cfg in cfg.custom_hooks:
+    #         assert isinstance(hook_cfg, dict), \
+    #             'Each item in custom_hooks expects dict type, but got ' \
+    #             f'{type(hook_cfg)}'
+    #         hook_cfg = hook_cfg.copy()
+    #         priority = hook_cfg.pop('priority', 'NORMAL')
+    #         hook = build_from_cfg(hook_cfg, HOOKS)
+    #         swa_runner.register_hook(hook, priority=priority)
 
     if cfg.swa_resume_from:
         swa_runner.resume(cfg.swa_resume_from)
