@@ -67,6 +67,7 @@ class CustomDataset(Dataset):
                  proposal_file=None,
                  test_mode=False,
                  filter_empty_gt=True,
+                 empty_gt_keep_prob=0,
                  file_client_args=dict(backend='disk')):
         self.ann_file = ann_file
         self.data_root = data_root
@@ -75,6 +76,7 @@ class CustomDataset(Dataset):
         self.proposal_file = proposal_file
         self.test_mode = test_mode
         self.filter_empty_gt = filter_empty_gt
+        self.empty_gt_keep_prob = empty_gt_keep_prob
         self.CLASSES = self.get_classes(classes)
         self.file_client = mmcv.FileClient(**file_client_args)
 

@@ -112,7 +112,7 @@ class CocoDataset(CustomDataset):
         valid_img_ids = []
         for i, img_info in enumerate(self.data_infos):
             img_id = self.img_ids[i]
-            if self.filter_empty_gt and img_id not in ids_in_cat:
+            if self.filter_empty_gt and img_id not in ids_in_cat and np.random.rand() > self.empty_gt_keep_prob:
                 continue
             if min(img_info['width'], img_info['height']) >= min_size:
                 valid_inds.append(i)
