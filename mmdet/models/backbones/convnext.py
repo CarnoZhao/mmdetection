@@ -68,8 +68,10 @@ class ConvNeXt(nn.Module):
     """
     def __init__(self, in_chans=3, depths=[3, 3, 9, 3], dims=[96, 192, 384, 768], 
                  drop_path_rate=0., layer_scale_init_value=1e-6, out_indices=[0, 1, 2, 3],
+                 pretrained=None,
                  ):
         super().__init__()
+        self.pretrained = pretrained
 
         self.downsample_layers = nn.ModuleList() # stem and 3 intermediate downsampling conv layers
         stem = nn.Sequential(
@@ -125,6 +127,8 @@ class ConvNeXt(nn.Module):
             elif isinstance(m, nn.LayerNorm):
                 nn.init.constant_(m.bias, 0)
                 nn.init.constant_(m.weight, 1.0)
+        if self.pretrained is not None:
+            pretrained = self.pretrained
 
         if isinstance(pretrained, str):
             self.apply(_init_weights)
