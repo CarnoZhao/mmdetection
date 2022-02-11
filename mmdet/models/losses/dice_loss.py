@@ -41,6 +41,10 @@ def dice_loss(pred,
     if weight is not None:
         assert weight.ndim == loss.ndim
         assert len(weight) == len(pred)
+    if weight.sum() == 0:
+        weight = torch.ones_like(weight)
+    else:
+        weight = weight/weight.sum()
     loss = weight_reduce_loss(loss, weight, reduction, avg_factor)
     return loss
 
