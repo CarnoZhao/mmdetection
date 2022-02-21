@@ -1,24 +1,19 @@
 num_classes = 1
 
+
+# model settings
 model = dict(
     type='CascadeRCNN',
     pretrained=None,
     backbone=dict(
-        type='SwinTransformer',
-        embed_dim=96,
-        depths=[2, 2, 18, 2],
-        num_heads=[3, 6, 12, 24],
-        window_size=7,
-        mlp_ratio=4.,
-        qkv_bias=True,
-        qk_scale=None,
-        drop_rate=0.,
-        attn_drop_rate=0.,
-        drop_path_rate=0.2,
-        ape=False,
-        patch_norm=True,
-        out_indices=(0, 1, 2, 3),
-        use_checkpoint=False),
+        type='ConvNeXt',
+        in_chans=3,
+        depths=[3, 3, 9, 3], 
+        dims=[96, 192, 384, 768], 
+        drop_path_rate=0.4,
+        layer_scale_init_value=1.0,
+        out_indices=[0, 1, 2, 3],
+    ),
     neck=dict(
         type='FPN',
         in_channels=[96, 192, 384, 768],
@@ -194,11 +189,11 @@ model = dict(
             nms=dict(type='nms', iou_threshold=0.7),
             min_bbox_size=0),
         rcnn=dict(
-            score_thr=0.0001,
+            score_thr=0.1,
             nms=dict(type='nms', iou_threshold=0.5),
             max_per_img=100)))
 
-dataset_type = 'CocoDataset'
+dataset_type = 'ReefDataset'
 data_root = 'data/reef/'
 classes = ["starfish"]
 
@@ -206,9 +201,7 @@ albu_train_transforms = [
     dict(type='VerticalFlip', p=0.5),
     dict(type='RandomRotate90', p=0.5),
     dict(type='ColorJitter', p=0.5),
-    # dict(type='MotionBlur', p=0.5)
-    # dict(type='Cutout', p=0.5)
-    # dict(type='Co', p=0.5)
+    #dict(type='ShiftScaleRotate', rotate_limit=5, p=0.5)
 ]
 
 img_norm_cfg = dict(
@@ -219,7 +212,7 @@ train_pipeline = [
     dict(type='RandomCrop', crop_size=(640,640)),
     dict(type='Resize', img_scale=[(800, 800), (1333, 1333)], keep_ratio=True),
     dict(type='RandomFlip', flip_ratio=0.5),
-    dict(type='AutoAugmentPolicy', autoaug_type="v2"),
+    dict(type='AutoAugmentPolicy', autoaug_type="v1"),
     dict(type='Albu',
          transforms=albu_train_transforms,
          bbox_params=dict(type='BboxParams',
@@ -240,7 +233,7 @@ test_pipeline = [
     dict(type='LoadImageFromFile'),
     dict(
         type='MultiScaleFlipAug',
-        img_scale=[(1600, 900)],
+        img_scale=[(2666, 1500)],
         flip=False,
         transforms=[
             dict(type='Resize', keep_ratio=True),
@@ -253,53 +246,62 @@ test_pipeline = [
 ]
 holdout = 1
 data = dict(
-    samples_per_gpu=3,
+    samples_per_gpu=4,
     workers_per_gpu=2,
     train=[dict(
                 filter_empty_gt=True,
+                empty_gt_keep_prob=0,
                 classes=classes,
-                type="CocoDataset",
-                ann_file=data_root + f'train/annotations/fold_{fold}.json',
+                type=dataset_type,
+                ann_file=data_root + f'train/annotations/fold_{fold}_subseq.json',
                 img_prefix=data_root + 'train/images/',
                 pipeline=train_pipeline) for fold in range(5) if fold != holdout],
     val=dict(
             classes=classes,
             type=dataset_type,
-            ann_file=data_root + f'train/annotations/fold_{holdout}.json',
+            ann_file=data_root + f'train/annotations/fold_{holdout}_subseq.json',
             img_prefix=data_root + 'train/images/',
             pipeline=test_pipeline),
     test=dict(
             classes=classes,
             type=dataset_type,
-            ann_file=data_root + f'train/annotations/fold_{holdout}.json',
+            ann_file=data_root + f'train/annotations/fold_{holdout}_subseq.json',
             img_prefix=data_root + 'train/images/',
             pipeline=test_pipeline)
 )
 
 nx = 1
-work_dir = f'./work_dirs/reef/sws_{nx}x_aav2_mx7_vf_r9_640rc_f{holdout}'
+work_dir = f'./work_dirs/reef/convx_t_{nx}x_aav1_f{holdout}'
 evaluation = dict(
     classwise=True, 
-    interval=4, 
+    interval=1, 
     metric='bbox',
     jsonfile_prefix=f"{work_dir}/valid")
-optimizer = dict(type='AdamW', lr=0.0001, betas=(0.9, 0.999), weight_decay=0.05,
-                 paramwise_cfg=dict(custom_keys={'absolute_pos_embed': dict(decay_mult=0.),
-                                                 'relative_position_bias_table': dict(decay_mult=0.),
-                                                 'norm': dict(decay_mult=0.)}))
+optimizer = dict(constructor='LearningRateDecayOptimizerConstructor', type='AdamW', 
+                 lr=0.0002, betas=(0.9, 0.999), weight_decay=0.05,
+                 paramwise_cfg={'decay_rate': 0.7,
+                                'decay_type': 'layer_wise',
+                                'num_layers': 6})
 optimizer_config = dict(grad_clip=None, cumulative_iters=1)
 lr_config = dict(
     policy='step',
     warmup='linear',
-    warmup_iters=50,
+    warmup_iters=500,
     warmup_ratio=0.001,
-    step=[8 * nx, 11 * nx])
+    step=[9 * nx, 11 * nx]
+)
 total_epochs = 12 * nx
 checkpoint_config = dict(interval=total_epochs, save_optimizer=False)
-log_config = dict(interval=50, hooks=[dict(type='TextLoggerHook')])
+log_config = dict(
+    interval=50,
+    hooks=[
+        dict(type='CustomizedTextLoggerHook'),
+        # dict(type='TensorboardLoggerHook')
+    ])
+
 dist_params = dict(backend='nccl')
 log_level = 'INFO'
-load_from = './weights/cascade_mask_rcnn_swin_small_patch4_window7.pth'
+load_from = "./weights/cascade_mask_rcnn_convnext_tiny_1k_3x.pth"
 resume_from = None
 workflow = [('train', 1)]
 fp16 = dict(loss_scale=512.0)

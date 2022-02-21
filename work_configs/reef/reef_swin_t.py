@@ -194,17 +194,19 @@ model = dict(
             nms=dict(type='nms', iou_threshold=0.7),
             min_bbox_size=0),
         rcnn=dict(
-            score_thr=0.0001,
-            nms=dict(type='soft_nms', iou_threshold=0.5, min_score=0.0001),
+            score_thr=0.1,
+            nms=dict(type='nms', iou_threshold=0.5),
             max_per_img=100)))
 
-dataset_type = 'CocoDataset'
+dataset_type = 'ReefDataset'
 data_root = 'data/reef/'
 classes = ["starfish"]
 
 albu_train_transforms = [
+    dict(type='VerticalFlip', p=0.5),
+    dict(type='RandomRotate90', p=0.5),
     dict(type='ColorJitter', p=0.5),
-    # dict(type='Co', p=0.5)
+    # dict(type='ShiftScaleRotate', p=0.5)
 ]
 
 img_norm_cfg = dict(
@@ -212,12 +214,10 @@ img_norm_cfg = dict(
 train_pipeline = [
     dict(type='LoadImageFromFile'),
     dict(type='LoadAnnotations', with_bbox=True),
-    dict(type='Resize', img_scale=[(4000, 1000), (4000, 1400)], keep_ratio=True),
+    dict(type='RandomCrop', crop_size=(640,640)),
+    dict(type='Resize', img_scale=[(800, 800), (1333, 1333)], keep_ratio=True),
     dict(type='RandomFlip', flip_ratio=0.5),
-    dict(type='AutoAugmentPolicy', autoaug_type="v1"),
-    # dict(type='BBoxJitter', min=0.95, max=1.05),
-    dict(type='Normalize', **img_norm_cfg),
-    dict(type='Pad', size_divisor=32),
+    dict(type='AutoAugmentPolicy', autoaug_type="v2"),
     dict(type='Albu',
          transforms=albu_train_transforms,
          bbox_params=dict(type='BboxParams',
@@ -228,6 +228,9 @@ train_pipeline = [
          keymap={'img': 'image', 'gt_bboxes': 'bboxes'},
          update_pad_shape=False,
          skip_img_without_anno=True),
+    dict(type='MixUp', p=0.7),
+    dict(type='Normalize', **img_norm_cfg),
+    dict(type='Pad', size_divisor=32),
     dict(type='DefaultFormatBundle'),
     dict(type='Collect', keys=['img', 'gt_bboxes', 'gt_labels']),
 ]
@@ -235,8 +238,8 @@ test_pipeline = [
     dict(type='LoadImageFromFile'),
     dict(
         type='MultiScaleFlipAug',
-        img_scale=[(4000, 1000), (4000, 1400)],
-        flip=True,
+        img_scale=[(1600, 900)],
+        flip=False,
         transforms=[
             dict(type='Resize', keep_ratio=True),
             dict(type='RandomFlip'),
@@ -246,62 +249,37 @@ test_pipeline = [
             dict(type='Collect', keys=['img']),
         ])
 ]
+holdout = 3
 data = dict(
-    samples_per_gpu=2,
+    samples_per_gpu=4,
     workers_per_gpu=2,
-    # train=dict(
-    #         classes=classes,
-    #         type=dataset_type,
-    #         ann_file=data_root + 'train/jsons/train_fold_0.json',
-    #         img_prefix=data_root + 'train/images/',
-    #         pipeline=train_pipeline),
-    train=dict(
-        type='ConcatDataset',
-        datasets=[
-            dict(
+    train=[dict(
                 filter_empty_gt=True,
-                downsample=5,
+                empty_gt_keep_prob=0,
                 classes=classes,
-                type="DownSampleCocoDataset",
-                ann_file=data_root + 'train/annotations/video_1.json',
+                type=dataset_type,
+                ann_file=data_root + f'train/annotations/fold_{fold}_subseq.json',
                 img_prefix=data_root + 'train/images/',
-                pipeline=train_pipeline),
-            dict(
-                filter_empty_gt=True,
-                downsample=5,
-                classes=classes,
-                type="DownSampleCocoDataset",
-                ann_file=data_root + 'train/annotations/video_2.json',
-                img_prefix=data_root + 'train/images/',
-                pipeline=train_pipeline),
-            ]),
+                pipeline=train_pipeline) for fold in range(5) if fold != holdout],
     val=dict(
-            filter_empty_gt=False,
             classes=classes,
             type=dataset_type,
-            ann_file=data_root + 'train/annotations/video_0.json',
+            ann_file=data_root + f'train/annotations/fold_{holdout}_subseq.json',
             img_prefix=data_root + 'train/images/',
             pipeline=test_pipeline),
-    # test=dict(
-    #         classes=classes,
-    #         type=dataset_type,
-    #         ann_file=data_root + 'train/jsons/valid_fold_0.json',
-    #         img_prefix=data_root + 'train/images/',
-    #         pipeline=test_pipeline),
     test=dict(
-            filter_empty_gt=True,
             classes=classes,
             type=dataset_type,
-            ann_file=data_root + 'test/annotations/test.json',
-            img_prefix=data_root + 'test/images/',
+            ann_file=data_root + f'train/annotations/fold_{holdout}_subseq.json',
+            img_prefix=data_root + 'train/images/',
             pipeline=test_pipeline)
 )
 
-nx = 2
-work_dir = f'./work_dirs/reef/swt_{nx}x_5d_aav1_cj_f0'
+nx = 1
+work_dir = f'./work_dirs/reef/swt_{nx}x_f{holdout}'
 evaluation = dict(
     classwise=True, 
-    interval=12, 
+    interval=1, 
     metric='bbox',
     jsonfile_prefix=f"{work_dir}/valid")
 optimizer = dict(type='AdamW', lr=0.0001, betas=(0.9, 0.999), weight_decay=0.05,
