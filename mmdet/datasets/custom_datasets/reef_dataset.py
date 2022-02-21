@@ -17,10 +17,10 @@ from mmcv.utils import print_log
 from terminaltables import AsciiTable
 
 from mmdet.core import eval_recalls
-from .api_wrappers import COCO, COCOeval
-from .builder import DATASETS
-from .custom import CustomDataset
-from .coco import CocoDataset
+from ..api_wrappers import COCO, COCOeval
+from ..builder import DATASETS
+from ..custom import CustomDataset
+from ..coco import CocoDataset
 
 @DATASETS.register_module()
 class ReefDataset(CocoDataset):
