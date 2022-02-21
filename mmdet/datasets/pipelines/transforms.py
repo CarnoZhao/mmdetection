@@ -1378,6 +1378,36 @@ class SegRescale:
 
 
 @PIPELINES.register_module()
+class Lambda:
+
+    def __init__(self, func = "lambda x: x", prob = 1, norm=True):
+        self.func = func
+        self.prob = prob
+        self.norm = norm
+
+    def __call__(self, results):
+        """Call function to perform photometric distortion on images.
+
+        Args:
+            results (dict): Result dict from loading pipeline.
+
+        Returns:
+            dict: Result dict with images distorted.
+        """
+
+        if 'img_fields' in results:
+            assert results['img_fields'] == ['img'], \
+                'Only single img_fields is allowed'
+        img = results['img']
+        if np.random.rand() < self.prob:
+            img = eval(self.func)(img)
+            if self.norm:
+                img = ((img - img.min()) / (np.ptp(img) + 1e-5) * 255).astype(np.uint8)
+
+        results['img'] = img
+        return results
+
+@PIPELINES.register_module()
 class PhotoMetricDistortion:
     """Apply photometric distortion to image sequentially, every transformation
     is applied with a probability of 0.5. The position of random contrast is in
